@@ -3,6 +3,7 @@ import * as Router from 'koa-router';
 
 import * as logger from 'koa-logger';
 import * as json from 'koa-json';
+import * as bodyParser from 'koa-bodyparser';
 
 const app = new Koa();
 const router = new Router();
@@ -15,8 +16,9 @@ router.get('/', async (ctx, next) => {
   await next();
 });
 
-app.use(logger());
 app.use(json());
+app.use(logger());
+app.use(bodyParser());
 
 app
   .use(router.routes())
