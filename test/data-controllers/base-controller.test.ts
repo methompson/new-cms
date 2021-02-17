@@ -2,6 +2,7 @@ import * as jwt from 'jsonwebtoken';
 
 import BasicDataController from '../../src/data-controllers/basic-controller';
 import { UserType, User } from '../../src/data-types';
+import { InvalidPasswordException, InvalidUsernameException } from '../../src/exceptions/user-exceptions';
 
 interface TestUser {
   username: string
@@ -231,6 +232,35 @@ describe('BasicDataController', () => {
 
         done();
       });
+
+      test('logUserIn will throw an error if the user doesn not exist', async(done) => {
+        let caught = false;
+        try {
+          await controller.logUserIn('not a user name', user1.password);
+        } catch (e) {
+          expect(e instanceof InvalidUsernameException).toBe(true);
+          caught = true;
+        }
+
+        expect(caught).toBe(true);
+
+        done();
+      });
+
+      test("logUserIn will throw an error if the user's password is invalid", async(done) => {
+        let caught = false;
+        try {
+          await controller.logUserIn(user1.username, 'incorrect password');
+        } catch (e) {
+          expect(e instanceof InvalidPasswordException).toBe(true);
+          caught = true;
+        }
+
+        expect(caught).toBe(true);
+
+        done();
+      });
+
     });
 
   });

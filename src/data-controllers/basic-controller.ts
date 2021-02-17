@@ -2,7 +2,7 @@ import * as jwt from 'jsonwebtoken';
 
 import { DataController } from './interfaces';
 import { BlogPost, User, UserType } from '../data-types';
-import { PasswordInvalidException, UserExistsException, UsernameInvalidException } from '../exceptions/user-exceptions';
+import { InvalidPasswordException, UserExistsException, InvalidUsernameException } from '../exceptions/user-exceptions';
 
 class BasicDataController implements DataController {
   private _blogPosts: {[key: number]: BlogPost } = {};
@@ -66,11 +66,11 @@ class BasicDataController implements DataController {
     const user = await this.getUserByUsername(username);
 
     if (user == null) {
-      throw new UsernameInvalidException();
+      throw new InvalidUsernameException();
     }
 
     if (password !== user.passwordHash) {
-      throw new PasswordInvalidException();
+      throw new InvalidPasswordException();
     }
 
     const secret = process.env.jwt_secret ?? 'default_secret';

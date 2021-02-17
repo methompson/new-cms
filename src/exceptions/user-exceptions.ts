@@ -5,13 +5,13 @@
 class UserExistsException extends Error {}
 
 // tslint:disable-next-line:max-classes-per-file
-class UsernameInvalidException extends Error {}
+class InvalidUsernameException extends Error {}
 
 // tslint:disable-next-line:max-classes-per-file
-class PasswordInvalidException extends Error {}
+class InvalidPasswordException extends Error {}
 
 export {
   UserExistsException,
-  UsernameInvalidException,
-  PasswordInvalidException,
+  InvalidUsernameException,
+  InvalidPasswordException,
 }
