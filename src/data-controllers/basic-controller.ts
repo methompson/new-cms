@@ -1,7 +1,7 @@
 import * as jwt from 'jsonwebtoken';
 
 import { DataController } from './interfaces';
-import { BlogPost, User, UserType } from '../data-types';
+import { BlogPost, User, UserToken, UserType } from '../data-types';
 import { InvalidPasswordException, UserExistsException, InvalidUsernameException } from '../exceptions/user-exceptions';
 
 class BasicDataController implements DataController {
@@ -75,7 +75,11 @@ class BasicDataController implements DataController {
 
     const secret = process.env.jwt_secret ?? 'default_secret';
 
-    return jwt.sign({username: user.username}, secret, { algorithm: 'HS256' });
+    const claims: UserToken = {
+      username: user.username,
+    };
+
+    return jwt.sign(claims, secret, { algorithm: 'HS256' });
   }
 
   private containsUser(username: string): boolean {

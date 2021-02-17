@@ -1,7 +1,7 @@
 import * as jwt from 'jsonwebtoken';
 
 import BasicDataController from '../../src/data-controllers/basic-controller';
-import { UserType, User } from '../../src/data-types';
+import { UserType, User, UserToken } from '../../src/data-types';
 import { InvalidPasswordException, InvalidUsernameException } from '../../src/exceptions/user-exceptions';
 
 interface TestUser {
@@ -224,8 +224,8 @@ describe('BasicDataController', () => {
         if (typeof decoded === 'object') {
           expect('username' in decoded).toBe(true);
 
-          const anyDecoded: any = decoded;
-          expect(anyDecoded.username).toBe(user1.username);
+          const typedDecoded = decoded as UserToken;
+          expect(typedDecoded.username).toBe(user1.username);
         } else {
           throw new Error('Invalid JWT');
         }
