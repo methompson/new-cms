@@ -1,12 +1,13 @@
 import * as jwt from 'jsonwebtoken';
 
 import { DataController } from './interfaces';
-import { BlogPost, User, UserToken, UserType } from '../data-types';
-import { InvalidPasswordException, UserExistsException, InvalidUsernameException } from '../exceptions/user-exceptions';
+import { InvalidPasswordException, UserExistsException, InvalidUsernameException } from '@root/exceptions/user-exceptions';
+import { BlogPost, User, UserToken, UserType, CMSContext } from '@dataTypes';
 
 class BasicDataController implements DataController {
   private _blogPosts: {[key: number]: BlogPost } = {};
   private _users: {[key: number]: User} = {};
+  cmsContext: CMSContext;
 
   get blogPosts() {
     return this._blogPosts;
@@ -14,6 +15,22 @@ class BasicDataController implements DataController {
 
   get users() {
     return this._users;
+  }
+
+  async init(cmsContext: CMSContext) {
+    this.cmsContext = cmsContext;
+
+    this._users[1] = {
+      id: '1',
+      username: 'admin',
+      email: 'admin@admin.admin',
+      firstName: 'admin',
+      lastName: 'admin',
+      userType: this.cmsContext.userTypeMap.getUserType('SuperAdmin'),
+      passwordHash: 'password',
+    };
+
+    return;
   }
 
   async getBlogPostBySlug(slug: string) {
@@ -34,11 +51,9 @@ class BasicDataController implements DataController {
   }
 
   async getUserById(userId: number) {
-    // tslint:disable-next-line:prefer-const
-    let undef;
     const user = this._users[userId];
 
-    if (typeof(user) === typeof(undef)) {
+    if (typeof(user) === 'undefined') {
       return null;
     }
 
@@ -53,6 +68,7 @@ class BasicDataController implements DataController {
     const id = this.getNextUserId();
 
     this._users[id] = {
+      id: `$id`,
       username,
       email,
       firstName,
@@ -62,7 +78,7 @@ class BasicDataController implements DataController {
     };
   }
 
-  async logUserIn(username: string, password: string) {
+  async logUserIn(username: string, password: string): Promise<string> {
     const user = await this.getUserByUsername(username);
 
     if (user == null) {
@@ -75,11 +91,22 @@ class BasicDataController implements DataController {
 
     const secret = process.env.jwt_secret ?? 'default_secret';
 
+    console.log('login secret', secret);
+
     const claims: UserToken = {
       username: user.username,
+      userType: user.userType.name,
+      userId: user.id,
     };
 
-    return jwt.sign(claims, secret, { algorithm: 'HS256' });
+    return jwt.sign(
+      claims,
+      secret,
+      {
+        algorithm: 'HS256',
+        expiresIn: '12h',
+      },
+    );
   }
 
   private containsUser(username: string): boolean {

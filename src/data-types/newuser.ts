@@ -1,6 +1,6 @@
-import UserType from './usertype-type';
+import UserType from './usertype';
 
-interface User {
+interface NewUser {
   username: string
   email: string
   firstName: string
@@ -9,4 +9,4 @@ interface User {
   passwordHash?: string
 }
 
-export default User;
+export default NewUser;

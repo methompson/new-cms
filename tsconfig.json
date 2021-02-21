@@ -9,10 +9,12 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "sourceMap": true,
-    "baseUrl": "./src",
+    "baseUrl": "./",
     "paths": {
-      "@dataTypes/*": ["data-types/*"]
-    }
+      "@dataTypes*": ["src/data-types/*", "src/data-types"],
+      "@root/*": ["src/*"]
+    },
+    "strictNullChecks": true
   },
   "include": [
     "./src/**/*"
