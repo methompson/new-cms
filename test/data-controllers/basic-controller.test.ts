@@ -1,19 +1,12 @@
 import * as jwt from 'jsonwebtoken';
 
 import BasicDataController from '../../src/data-controllers/basic-controller';
-import { UserType, User, UserToken } from '../../src/data-types';
+import { UserType, User, UserToken, UserTypeMap, NewUser } from '../../src/data-types';
 import { InvalidPasswordException, InvalidUsernameException } from '../../src/exceptions/user-exceptions';
 
-interface TestUser {
-  username: string
-  email: string
-  firstName: string
-  lastName: string
-  userType: UserType
-  password: string
-}
-
 describe('BasicDataController', () => {
+  const userTypeMap = new UserTypeMap();
+
   test('BasicDataController has an empty users and empty blogPosts object', () => {
     const controller = new BasicDataController();
 
@@ -21,25 +14,58 @@ describe('BasicDataController', () => {
     expect(Object.keys(controller.blogPosts).length).toBe(0);
   });
 
-  // describe('blogPosts', () => {});
+  describe('blogPosts', () => {
+    describe('getBlogPostBySlug', () => {
+      test('getBlogPostBySlug will retrieve a blog post if you provide a valid title slug', async (done) => {
+        const controller = new BasicDataController();
+
+        const entry = await controller.addBlogPost({
+          title: 'test title',
+          titleSlug: 'test_title_slug',
+          content: 'content',
+          preview: 'preview',
+          publishDate: 1,
+          updateDate: 1,
+          author: 1,
+        });
+
+        const post = await controller.getBlogPostBySlug('test_title_slug');
+
+        expect(post.id).toBe(entry.id);
+
+        done();
+      });
+
+      test('getBlogPostBySlug will return null if you do not request a valid slug', async (done) => {
+        const controller = new BasicDataController();
+
+        const post = await controller.getBlogPostBySlug('test_title_slug');
+
+        expect(post).toBeNull();
+
+        done();
+      });
+    });
+
+  });
 
   describe('users', () => {
-    const user1:TestUser = {
+    const user1: NewUser = {
       username: 'username',
       email: 'test@test.test',
-      password: 'password',
+      passwordHash: 'password',
       firstName: 'firstName',
       lastName: 'lastName',
-      userType: UserType.Admin,
+      userType: userTypeMap.getUserType('Admin'),
     }
 
-    const user2:TestUser = {
+    const user2: NewUser = {
       username: 'username2',
       email: 'test2@test.test',
-      password: 'password2',
+      passwordHash: 'password2',
       firstName: 'firstName2',
       lastName: 'lastName2',
-      userType: UserType.SuperAdmin,
+      userType: userTypeMap.getUserType('SuperAdmin'),
     }
     describe('addUser', () => {
       test('addUser will add a user to the users lists', async (done) => {
@@ -47,14 +73,11 @@ describe('BasicDataController', () => {
 
         expect(Object.keys(controller.users).length).toBe(0);
 
-        await controller.addUser(
-          user1.username,
-          user1.email,
-          user1.password,
-          user1.firstName,
-          user1.lastName,
-          user1.userType,
-        );
+        const newUser: NewUser = {
+          ...user1,
+        };
+
+        await controller.addUser(newUser);
 
         expect(Object.keys(controller.users).length).toBe(1);
 
@@ -64,23 +87,11 @@ describe('BasicDataController', () => {
       test('addUser will start the id of new users at 1 and auto increment the id for new users being added', async (done) => {
         const controller = new BasicDataController();
 
-        await controller.addUser(
-          user1.username,
-          user1.email,
-          user1.password,
-          user1.firstName,
-          user1.lastName,
-          user1.userType,
-        );
+        const newUser1 = { ...user1 };
+        const newUser2 = { ...user2 };
 
-        await controller.addUser(
-          user2.username,
-          user2.email,
-          user2.password,
-          user2.firstName,
-          user2.lastName,
-          user2.userType,
-        );
+        await controller.addUser(newUser1);
+        await controller.addUser(newUser2);
 
         expect(controller.users[1].username).toBe(user1.username);
         expect(controller.users[2].username).toBe(user2.username);
@@ -95,23 +106,11 @@ describe('BasicDataController', () => {
       beforeEach(async (done) => {
         controller = new BasicDataController();
 
-        await controller.addUser(
-          user1.username,
-          user1.email,
-          user1.password,
-          user1.firstName,
-          user1.lastName,
-          user1.userType,
-        );
+        const newUser1 = { ...user1 };
+        const newUser2 = { ...user2 };
 
-        await controller.addUser(
-          user2.username,
-          user2.email,
-          user2.password,
-          user2.firstName,
-          user2.lastName,
-          user2.userType,
-        );
+        await controller.addUser(newUser1);
+        await controller.addUser(newUser2);
 
         done();
       });
@@ -143,23 +142,11 @@ describe('BasicDataController', () => {
       beforeEach(async (done) => {
         controller = new BasicDataController();
 
-        await controller.addUser(
-          user1.username,
-          user1.email,
-          user1.password,
-          user1.firstName,
-          user1.lastName,
-          user1.userType,
-        );
+        const newUser1 = { ...user1 };
+        const newUser2 = { ...user2 };
 
-        await controller.addUser(
-          user2.username,
-          user2.email,
-          user2.password,
-          user2.firstName,
-          user2.lastName,
-          user2.userType,
-        );
+        await controller.addUser(newUser1);
+        await controller.addUser(newUser2);
 
         done();
       });
@@ -192,29 +179,17 @@ describe('BasicDataController', () => {
       beforeEach(async (done) => {
         controller = new BasicDataController();
 
-        await controller.addUser(
-          user1.username,
-          user1.email,
-          user1.password,
-          user1.firstName,
-          user1.lastName,
-          user1.userType,
-        );
+        const newUser1 = { ...user1 };
+        const newUser2 = { ...user2 };
 
-        await controller.addUser(
-          user2.username,
-          user2.email,
-          user2.password,
-          user2.firstName,
-          user2.lastName,
-          user2.userType,
-        );
+        await controller.addUser(newUser1);
+        await controller.addUser(newUser2);
 
         done();
       });
 
       test('logUserIn will return a string if the credentials are correct', async(done) => {
-        const token = await controller.logUserIn(user1.username, user1.password);
+        const token = await controller.logUserIn(user1.username, user1.passwordHash);
 
         expect(typeof token).toBe(typeof '');
         expect(token.length > 0).toBe(true);
@@ -236,7 +211,7 @@ describe('BasicDataController', () => {
       test('logUserIn will throw an error if the user doesn not exist', async(done) => {
         let caught = false;
         try {
-          await controller.logUserIn('not a user name', user1.password);
+          await controller.logUserIn('not a user name', user1.passwordHash);
         } catch (e) {
           expect(e instanceof InvalidUsernameException).toBe(true);
           caught = true;
@@ -265,7 +240,3 @@ describe('BasicDataController', () => {
 
   });
 });
-
-
-
-

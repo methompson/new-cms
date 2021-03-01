@@ -1,4 +1,4 @@
-import NewUser from './newuser';
+import NewUser from './new-user';
 
 interface User extends NewUser {
   id: string,

@@ -1,4 +1,4 @@
-interface BlogPost {
+interface NewBlogPost {
   title: string
   titleSlug: string
   content: string
@@ -8,4 +8,4 @@ interface BlogPost {
   author: number
 }
 
-export default BlogPost;
+export default NewBlogPost;

@@ -1,11 +1,11 @@
-import { User, UserType } from '@dataTypes';
+import { User, NewUser } from '@dataTypes';
 
 
 interface UserController {
   getUserByUsername: (username: string) => Promise<User | null>
   getUserById: (userId: number) => Promise<User | null>
 
-  addUser: (username: string, email: string, password: string, firstName: string, lastName: string, userType: UserType) => Promise<void>
+  addUser: (user: NewUser) => Promise<User>
   logUserIn: (username: string, password: string) => Promise<string>
 }
 
