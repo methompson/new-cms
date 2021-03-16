@@ -238,33 +238,26 @@ class CMS extends ErrorHandler {
   private async addUser(ctx: ParameterizedContext, next: () => Promise<any>) {
     const newUser = ctx?.request?.body?.newUser;
 
-    console.log('type of', typeof ctx);
+    let u: NewUser;
 
-    if ( typeof newUser?.username !== 'string'
-      || typeof newUser?.email !== 'string'
-      || typeof newUser?.password !== 'string'
-    ) {
+    try {
+      u = NewUser.fromJson({
+        username: newUser.username,
+        email: newUser.email,
+        passwordHash: newUser.password,
+        firstName: newUser.firstName ?? '',
+        lastName: newUser.lastName ?? '',
+        userType: newUser.userType ?? '',
+      }, this.context.userTypeMap);
+    } catch(e) {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
 
-    const userType: UserType = this.context.userTypeMap.getUserType(newUser.userType ?? '');
-
-    const u: NewUser = {
-      username: newUser.username,
-      email: newUser.email,
-      passwordHash: newUser.password,
-      firstName: newUser.firstName ?? '',
-      lastName: newUser.lastName ?? '',
-      userType,
-    };
-
     let savedUser: User;
 
-    console.log('Before the try statement');
 
     try {
-      console.log('In the try statement');
       savedUser = await this.dataController.addUser(u);
     } catch (e) {
       if (e instanceof UserExistsException) {
@@ -281,13 +274,20 @@ class CMS extends ErrorHandler {
       email: savedUser.email,
       firstName: savedUser.firstName,
       lastName: savedUser.lastName,
-      userType: userType.name,
+      userType: savedUser.userType.name,
     };
 
     next();
   }
 
   private async editUser(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const body = ctx?.request?.body;
+
+    if (typeof body?.id !== 'string') {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
     ctx.body = {
       msg: './api/user/edit',
     };
@@ -295,9 +295,30 @@ class CMS extends ErrorHandler {
     next();
   }
 
+  // TODO add a catch that prevents a user from deleteing themself.
   private async deleteUser(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const body = ctx?.request?.body;
+
+    if (typeof body?.id !== 'string') {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    const userId = ctx?.state?.user?.userId;
+    if (userId === body?.id) {
+      this.send400Error(ctx, 'You cannot delete yourself');
+      return;
+    }
+
+    try {
+      await this.dataController.deleteUser(body.id);
+    } catch(e) {
+      this.send400Error(ctx, 'User does not exist');
+      return;
+    }
+
     ctx.body = {
-      msg: './api/user/delete',
+      msg: `user id ${body.id} deleted`,
     };
 
     next();

@@ -163,25 +163,44 @@ class BasicDataController implements DataController {
 
     const id = this.getNextUserId();
 
-    this._users[id] = {
-      id: `${id}`,
-      username: user.username,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      passwordHash: user.passwordHash,
-      userType: user.userType,
-    };
+    const u = new User(
+      `${id}`,
+      user.username,
+      user.email,
+      user.firstName,
+      user.lastName,
+      user.userType,
+      user.passwordHash,
+    );
 
-    const u: User = {
-      ...user,
-      id: `${id}`,
-    };
+    this._users[id] = u;
 
     // We don't need to await this.
     this.writeUserData();
 
     return u;
+  }
+
+  async editUser(user: User): Promise<User> {
+    if (!(user.id in this._users)) {
+      throw new Error('User Does Not Exist');
+    }
+
+    this._users[user.id] = user;
+
+    this.writeUserData();
+
+    return user;
+  }
+
+  async deleteUser(id: string) {
+    if (!(id in this._users)) {
+      throw new Error('User Does Not Exist');
+    }
+
+    delete this._users[id];
+
+    this.writeUserData();
   }
 
   async logUserIn(username: string, password: string): Promise<string> {
@@ -304,58 +323,23 @@ class BasicDataController implements DataController {
 
     handle.close();
 
-    console.log('userDataString', userDataString);
-
     const rawUserData = JSON.parse(userDataString);
 
-    const userData = this.parseUserData(rawUserData);
-
-    this._users = userData;
-  }
-
-  private parseUserData(rawUserData: any): {[key: number]: User} {
     const userData: {[key: number]: User} = {};
-
-    if (typeof rawUserData !== 'object') {
-      return userData;
-    }
-
-    const isUser = (val: any): boolean => {
-      if (typeof val === 'object'
-        && 'username' in val
-        && typeof val.username === 'string'
-        && 'userType' in val
-        && typeof val.userType === 'string'
-        && 'passwordHash' in val
-        && typeof val.passwordHash === 'string'
-        && 'id' in val
-        && typeof val.id === 'string'
-      ) {
-        return true;
-      }
-
-      return false;
-    }
 
     Object.keys(rawUserData).forEach((key) => {
       const rawUser = rawUserData[key];
-
-      if (isUser(rawUser)) {
-        const user: User = {
-          id: rawUser.id,
-          username: rawUser.username,
-          passwordHash: rawUser.passwordHash,
-          userType: this.cmsContext.userTypeMap.getUserType(rawUser.userType),
-          email: rawUser.email ?? '',
-          firstName: rawUser.firstName ?? '',
-          lastName: rawUser.lastName ?? '',
-        };
-
+      try {
+        const user = User.fromJson(rawUser, this.cmsContext.userTypeMap);
         userData[user.id] = user;
+      } catch(e) {
+        // Do nothing
       }
     });
 
-    return userData;
+    // const userData = this.parseUserData(rawUserData);
+
+    this._users = userData;
   }
 }
 
