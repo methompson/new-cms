@@ -6,6 +6,7 @@ import ErrorHandler from './error-handler';
 import { useRouteProtection } from './route-protection';
 import { ParameterizedContext } from 'koa';
 import { InsufficientPermissionsException, UserExistsException } from '@root/exceptions/user-exceptions';
+import { InvalidDataControllerException } from '@root/exceptions/cms-exceptions';
 
 class CMS extends ErrorHandler {
   dataController: DataController;
@@ -18,12 +19,12 @@ class CMS extends ErrorHandler {
 
   theContext: CMS;
 
-  constructor(dataController: DataController) {
+  constructor() {
     super();
-    this.dataController = dataController;
   }
 
-  async init() {
+  async init(dataController: DataController, options?: any) {
+    this.dataController = dataController;
     const userTypeMap = new UserTypeMap();
 
     this.context = {
@@ -31,6 +32,10 @@ class CMS extends ErrorHandler {
     };
 
     await this.dataController.init(this.context);
+
+    if (this.dataController.initialized === false) {
+      throw new InvalidDataControllerException();
+    }
 
     this.blogRouter = this.initBlogRouter();
     this.userRouter = this.initUserRouter();
@@ -44,7 +49,7 @@ class CMS extends ErrorHandler {
   }
 
   private initBlogRouter(): Router {
-    const writerUserType = this.context.userTypeMap.getUserType('Wroter');
+    const writerUserType = this.context.userTypeMap.getUserType('Writer');
     const r = new Router();
 
     r.get(
@@ -111,6 +116,20 @@ class CMS extends ErrorHandler {
       useRouteProtection(),
       async (ctx, next) => this.filterByUserType(ctx, next, adminUserType),
       async (ctx, next) => this.addUser(ctx, next),
+    );
+
+    r.post(
+      '/edit',
+      useRouteProtection(),
+      async (ctx, next) => this.filterByUserType(ctx, next, adminUserType),
+      async (ctx, next) => this.editUser(ctx, next),
+    );
+
+    r.post(
+      '/delete',
+      useRouteProtection(),
+      async (ctx, next) => this.filterByUserType(ctx, next, adminUserType),
+      async (ctx, next) => this.deleteUser(ctx, next),
     );
 
     return r;
@@ -242,7 +261,10 @@ class CMS extends ErrorHandler {
 
     let savedUser: User;
 
+    console.log('Before the try statement');
+
     try {
+      console.log('In the try statement');
       savedUser = await this.dataController.addUser(u);
     } catch (e) {
       if (e instanceof UserExistsException) {
@@ -260,6 +282,22 @@ class CMS extends ErrorHandler {
       firstName: savedUser.firstName,
       lastName: savedUser.lastName,
       userType: userType.name,
+    };
+
+    next();
+  }
+
+  private async editUser(ctx: ParameterizedContext, next: () => Promise<any>) {
+    ctx.body = {
+      msg: './api/user/edit',
+    };
+
+    next();
+  }
+
+  private async deleteUser(ctx: ParameterizedContext, next: () => Promise<any>) {
+    ctx.body = {
+      msg: './api/user/delete',
     };
 
     next();

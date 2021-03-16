@@ -1,8 +1,9 @@
 import * as jwt from 'jsonwebtoken';
 
 import BasicDataController from '../../src/data-controllers/basic-controller';
-import { UserType, User, UserToken, UserTypeMap, NewUser } from '../../src/data-types';
+import { UserType, User, UserToken, UserTypeMap, NewUser, NewBlogPost, BlogPost } from '../../src/data-types';
 import { InvalidPasswordException, InvalidUsernameException } from '../../src/exceptions/user-exceptions';
+import { BlogDoesNotExistException } from '../../src/exceptions/blog-exceptions';
 
 describe('BasicDataController', () => {
   const userTypeMap = new UserTypeMap();
@@ -42,6 +43,197 @@ describe('BasicDataController', () => {
         const post = await controller.getBlogPostBySlug('test_title_slug');
 
         expect(post).toBeNull();
+
+        done();
+      });
+    });
+
+    describe('getBlogPostById', () => {
+      test('getBlogPostById will retrieve a blog post by id', async (done) => {
+        const controller = new BasicDataController();
+
+        const entry = await controller.addBlogPost({
+          title: 'test title',
+          titleSlug: 'test_title_slug',
+          content: 'content',
+          preview: 'preview',
+          publishDate: 1,
+          updateDate: 1,
+          author: 1,
+        });
+
+        const post = await controller.getBlogPostById(entry.id);
+
+        expect(post.id).toBe(entry.id);
+
+        done();
+      });
+
+      test('getBlogPostById will retrieve a blog post by id', async (done) => {
+        const controller = new BasicDataController();
+
+        let caught: number = 0;
+        try {
+          const post = await controller.getBlogPostById('1');
+        } catch(e) {
+          expect(e instanceof BlogDoesNotExistException);
+          caught += 1;
+        }
+
+        expect(caught).toBe(1);
+
+        done();
+      });
+    });
+
+    describe('addBlogPost', () => {
+      test('addBlogPost will add a blog post and return a blog post object', async (done) => {
+        const controller = new BasicDataController();
+
+        const newBlogPost: NewBlogPost = {
+          title: 'test title',
+          titleSlug: 'test_title_slug',
+          content: 'content',
+          preview: 'preview',
+          publishDate: 1,
+          updateDate: 1,
+          author: 1,
+        };
+
+        const entry = await controller.addBlogPost(newBlogPost);
+
+        expect(entry.title).toBe(newBlogPost.title);
+        expect(entry.titleSlug).toBe(newBlogPost.titleSlug);
+        expect(entry.content).toBe(newBlogPost.content);
+        expect(entry.preview).toBe(newBlogPost.preview);
+        expect(entry.publishDate).toBe(newBlogPost.publishDate);
+        expect(entry.updateDate).toBe(newBlogPost.updateDate);
+        expect(entry.author).toBe(newBlogPost.author);
+
+        done();
+      });
+    });
+
+    describe('editBlogPost', () => {
+      test('editBlogPost will update the blog post from the controller', async (done) => {
+        const controller = new BasicDataController();
+
+        const newBlogPost: NewBlogPost = {
+          title: 'test title',
+          titleSlug: 'test_title_slug',
+          content: 'content',
+          preview: 'preview',
+          publishDate: 1,
+          updateDate: 1,
+          author: 1,
+        };
+
+        const entry = await controller.addBlogPost(newBlogPost);
+
+        expect(entry.title).toBe(newBlogPost.title);
+        expect(entry.titleSlug).toBe(newBlogPost.titleSlug);
+        expect(entry.content).toBe(newBlogPost.content);
+        expect(entry.preview).toBe(newBlogPost.preview);
+        expect(entry.publishDate).toBe(newBlogPost.publishDate);
+        expect(entry.updateDate).toBe(newBlogPost.updateDate);
+        expect(entry.author).toBe(newBlogPost.author);
+
+        const updatedBlogPost: BlogPost = {
+          id: entry.id,
+          title: 'updated title',
+          titleSlug: 'new_test_title_slug',
+          content: 'edited_content',
+          preview: 'edited_preview',
+          publishDate: 1,
+          updateDate: 2,
+          author: 3,
+        };
+
+        const updatedEntry = await controller.editBlogPost(updatedBlogPost);
+
+        expect(updatedEntry.id).toBe(updatedBlogPost.id);
+        expect(updatedEntry.title).toBe(updatedBlogPost.title);
+        expect(updatedEntry.titleSlug).toBe(updatedBlogPost.titleSlug);
+        expect(updatedEntry.content).toBe(updatedBlogPost.content);
+        expect(updatedEntry.preview).toBe(updatedBlogPost.preview);
+        expect(updatedEntry.publishDate).toBe(updatedBlogPost.publishDate);
+        expect(updatedEntry.updateDate).toBe(updatedBlogPost.updateDate);
+        expect(updatedEntry.author).toBe(updatedBlogPost.author);
+
+        done();
+      });
+
+      test('editBlogPost will throw an error if the blog post does not exist', async (done) => {
+        const controller = new BasicDataController();
+
+        let caught = 0;
+
+        try {
+          await controller.editBlogPost({
+            id: '1',
+            title: 'test title',
+            titleSlug: 'test_title_slug',
+            content: 'content',
+            preview: 'preview',
+            publishDate: 1,
+            updateDate: 1,
+            author: 1,
+          });
+        } catch (e) {
+          expect(e instanceof BlogDoesNotExistException);
+          caught += 1;
+        }
+
+        expect(caught).toBe(1);
+
+        done();
+      });
+    });
+
+    describe('deleteBlogPost', () => {
+      test('deleteBlogPost will delete the blog post from the controller', async (done) => {
+        const controller = new BasicDataController();
+
+        const newBlogPost: NewBlogPost = {
+          title: 'test title',
+          titleSlug: 'test_title_slug',
+          content: 'content',
+          preview: 'preview',
+          publishDate: 1,
+          updateDate: 1,
+          author: 1,
+        };
+
+        const entry = await controller.addBlogPost(newBlogPost);
+
+        let blog: BlogPost;
+
+        blog = await controller.getBlogPostById(entry.id);
+
+        expect(blog.id).toBe(entry.id);
+
+        await controller.deleteBlogPost(entry.id);
+
+        blog = await controller.getBlogPostById(entry.id);
+
+        expect(blog).toBe(null);
+
+        done();
+      });
+
+      test('deleteBlogPost will throw an error if the blog post does not exist', async (done) => {
+        const controller = new BasicDataController();
+
+        let caught = 0;
+
+        try {
+          await controller.deleteBlogPost('1');
+        } catch (e) {
+          expect(e instanceof BlogDoesNotExistException);
+          caught += 1;
+        }
+
+        expect(caught).toBe(1);
 
         done();
       });

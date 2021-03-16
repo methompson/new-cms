@@ -1,0 +1,1 @@
+{"1":{"id":"1","username":"admin","email":"admin@admin.admin","firstName":"admin","lastName":"admin","passwordHash":"password","userType":"SuperAdmin"},"2":{"id":"2","username":"writer","email":"writer@admin.admin","firstName":"writer","lastName":"writer","passwordHash":"password","userType":"Writer"}}

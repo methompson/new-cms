@@ -28,10 +28,12 @@ import { BasicDataController } from './data-controllers';
   let cms: CMS;
 
   try {
-    const dc = new BasicDataController();
+    const dc = new BasicDataController({
+      'dataLocation': './data/',
+    });
 
-    cms = new CMS(dc);
-    await cms.init();
+    cms = new CMS();
+    await cms.init(dc);
   } catch (e) {
     // handle accordingly
     console.log('Unable to instance data controller', e);

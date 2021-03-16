@@ -1,4 +1,4 @@
-import BasicDataController from './basic-controller';
+import { BasicDataController } from './basic-controller';
 
 export {
   BasicDataController,
