@@ -1,11 +1,12 @@
 import * as jwt from 'jsonwebtoken';
-import { FileHandle, open, writeFile } from 'fs/promises';
+import { FileHandle, open, writeFile, mkdir } from 'fs/promises';
 import * as path from 'path';
 
 import { DataController } from '@root/data-controllers/interfaces';
 import { InvalidPasswordException, UserExistsException, InvalidUsernameException } from '@root/exceptions/user-exceptions';
 import { BlogPost, User, UserToken, CMSContext, NewUser, NewBlogPost } from '@dataTypes';
 import { BlogDoesNotExistException } from '@root/exceptions/blog-exceptions';
+import { fstat } from 'node:fs';
 
 class BasicDataController implements DataController {
   private _blogPosts: {[key: number]: BlogPost } = {};
@@ -317,8 +318,14 @@ class BasicDataController implements DataController {
    * It will parse the contents of the file and insert the value into the _users variable.
    */
   private async readUserData(): Promise<void> {
+
+    await mkdir(this.dataLocation, { recursive: true });
+
+    // We have to use a+ to create the file if it doesn't exist.
+    // r will throw an exception if the file doesn't exist.
+    // w+ will truncate the file if it already exists.
     const loc = path.join(this.dataLocation, 'users.json');
-    const handle = await open(loc, 'r');
+    const handle = await open(loc, 'a+');
     const userDataString = await handle.readFile('utf-8');
 
     handle.close();
