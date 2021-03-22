@@ -8,9 +8,15 @@
     "moduleResolution": "node",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "baseUrl": "./",
+    "paths": {
+      "@dataTypes*": ["src/data-types/*", "src/data-types"],
+      "@root/*": ["src/*"]
+    },
+    "strictNullChecks": true
   },
   "include": [
     "./src/**/*"
-  ]
+  ],
 }
