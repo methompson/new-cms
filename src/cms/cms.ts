@@ -5,7 +5,7 @@ import { DataController } from '@root/data-controllers/interfaces';
 import ErrorHandler from './error-handler';
 import { useRouteProtection } from './route-protection';
 import { ParameterizedContext } from 'koa';
-import { InsufficientPermissionsException, UserExistsException } from '@root/exceptions/user-exceptions';
+import { EmailExistsException, InsufficientPermissionsException, UserExistsException } from '@root/exceptions/user-exceptions';
 import { InvalidDataControllerException } from '@root/exceptions/cms-exceptions';
 
 class CMS extends ErrorHandler {
@@ -244,7 +244,7 @@ class CMS extends ErrorHandler {
       u = NewUser.fromJson({
         username: newUser.username,
         email: newUser.email,
-        passwordHash: newUser.password,
+        password: newUser.password,
         firstName: newUser.firstName ?? '',
         lastName: newUser.lastName ?? '',
         userType: newUser.userType ?? '',
@@ -280,6 +280,12 @@ class CMS extends ErrorHandler {
     next();
   }
 
+  /**
+   * Does not edit the user's password
+   * @param ctx
+   * @param next
+   * @returns
+   */
   private async editUser(ctx: ParameterizedContext, next: () => Promise<any>) {
     const body = ctx?.request?.body;
 
@@ -287,15 +293,90 @@ class CMS extends ErrorHandler {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
+    // We prevent a user from editing a user of a higher level. e.g. admin user types
+    // cannot delete super admins.
+    const currentEditedUser = await this.dataController.getUserById(body.id);
+    if (currentEditedUser === null) {
+      this.send400Error(ctx, 'User does not exist');
+      return;
+    }
+
+    const userTypeMap = this.context.userTypeMap;
+
+    // There should be no problem here. We use filterByUserType to make sure that the
+    // userType actually exists.
+    const requester = ctx?.state?.user;
+    const requesterType = userTypeMap.getUserType(requester?.userType);
+
+    // compareUserTypeLevels will compare the first userType to the second. If the first
+    // is lower than the second, it will return a value less than 1.
+    if (userTypeMap.compareUserTypeLevels(requesterType, currentEditedUser.userType) < 0) {
+      this.send400Error(ctx, 'Cannot edit a user of a higher level');
+      return;
+    }
+
+    // If we made it here, we're going to construct the new User object with the old
+    // user data and the new user data.
+
+    // We have to be careful with user type. We already prevent the user from updating
+    // users of a higher user type. However, we also need to make sure that the user
+    // type they're updating isn't higher than their current user type. The API will
+    // not prevent a user from demoting themself.
+    let newUserType: UserType;
+
+    if (body?.userType == null) {
+      newUserType = currentEditedUser.userType;
+    } else {
+      const requestedUserType = userTypeMap.getUserType(body?.userType);
+
+      if(userTypeMap.compareUserTypeLevels(requesterType, requestedUserType) < 0) {
+        this.send400Error(ctx, 'Cannot set user to a higher user level than your own.');
+        return;
+      }
+
+      newUserType = requestedUserType;
+    }
+
+    const editedUser = new User(
+      currentEditedUser.id,
+      body?.username ?? currentEditedUser.username,
+      body?.email ?? currentEditedUser.email,
+      body?.firstName ?? currentEditedUser.firstName,
+      body?.lastName ?? currentEditedUser.lastName,
+      newUserType,
+      currentEditedUser.passwordHash,
+    );
+
+    let result: User;
+
+    try {
+      result = await this.dataController.editUser(editedUser);
+    } catch (e) {
+      let msg: string = '';
+      if (e instanceof EmailExistsException) {
+        msg += 'Email already exists for another user.';
+      } else if (e instanceof UserExistsException) {
+        msg += 'Username already exists for another user.';
+      } else {
+        msg += `$e`;
+      }
+
+      this.send400Error(ctx, msg);
+      return;
+    }
 
     ctx.body = {
-      msg: './api/user/edit',
+      id: result.id,
+      username: result.username,
+      email: result.email,
+      firstName: result.firstName,
+      lastName: result.lastName,
+      userType: result.userType.name,
     };
 
     next();
   }
 
-  // TODO add a catch that prevents a user from deleteing themself.
   private async deleteUser(ctx: ParameterizedContext, next: () => Promise<any>) {
     const body = ctx?.request?.body;
 
@@ -304,9 +385,29 @@ class CMS extends ErrorHandler {
       return;
     }
 
-    const userId = ctx?.state?.user?.userId;
-    if (userId === body?.id) {
+    // We prevent our user from deleting themself.
+    const requester = ctx?.state?.user;
+    if (requester?.userId === body?.id) {
       this.send400Error(ctx, 'You cannot delete yourself');
+      return;
+    }
+
+    // We prevent a user from deleting a user of a higher level. e.g. admin user types
+    // cannot delete super admins.
+    const deletedUser = await this.dataController.getUserById(body.id);
+    if (deletedUser === null) {
+      this.send400Error(ctx, 'User does not exist');
+      return;
+    }
+
+    // There should be no problem here. We use filterByUserType to make sure that the
+    // userType actually exists.
+    const requesterType = this.context.userTypeMap.getUserType(requester?.userType);
+
+    // compareUserTypeLevels will compare the first userType to the second. If the first
+    // is lower than the second, it will return a value less than 1.
+    if (this.context.userTypeMap.compareUserTypeLevels(requesterType, deletedUser.userType) < 0) {
+      this.send400Error(ctx, 'Cannot delete a user of a higher level');
       return;
     }
 

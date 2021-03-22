@@ -1,8 +1,8 @@
 import { UserTypeMap } from '@dataTypes';
-import NewUser from './new-user';
+import UserBase from './user-base';
 import UserType from './usertype';
 
-class User extends NewUser {
+class User extends UserBase {
   constructor(
     public id: string,
     username: string,
@@ -10,9 +10,9 @@ class User extends NewUser {
     firstName: string,
     lastName: string,
     userType: UserType,
-    passwordHash?: string,
+    public passwordHash: string,
   ) {
-    super(username, email, firstName, lastName, userType, passwordHash);
+    super(username, email, firstName, lastName, userType);
   }
 
   static fromJson(rawJson: any, userTypeMap: UserTypeMap): User {

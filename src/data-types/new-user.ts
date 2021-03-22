@@ -1,15 +1,18 @@
 import { UserTypeMap } from '@dataTypes';
 import UserType from './usertype';
+import UserBase from './user-base';
 
-class NewUser {
+class NewUser extends UserBase {
   constructor(
-    public username: string,
-    public email: string,
-    public firstName: string,
-    public lastName: string,
-    public userType: UserType,
-    public passwordHash?: string,
-  ) {}
+    username: string,
+    email: string,
+    firstName: string,
+    lastName: string,
+    userType: UserType,
+    public password: string,
+  ) {
+    super(username, email, firstName, lastName, userType);
+  }
 
   static fromJson(rawJson: any, userTypeMap: UserTypeMap): NewUser {
     const isUser = (val: any): boolean => {
@@ -18,8 +21,8 @@ class NewUser {
         && typeof val.username === 'string'
         && 'email' in val
         && typeof val.email === 'string'
-        && 'passwordHash' in val
-        && typeof val.passwordHash === 'string'
+        && 'password' in val
+        && typeof val.password === 'string'
       ) {
         return true;
       }
@@ -37,7 +40,7 @@ class NewUser {
       rawJson.firstName ?? '',
       rawJson.lastName ?? '',
       userTypeMap.getUserType(rawJson.userType),
-      rawJson.passwordHash,
+      rawJson.password,
     );
 
     return user;

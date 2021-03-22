@@ -1,12 +1,12 @@
 import * as jwt from 'jsonwebtoken';
-import { FileHandle, open, writeFile, mkdir } from 'fs/promises';
+import { open, writeFile, mkdir } from 'fs/promises';
 import * as path from 'path';
+import * as bcrypt from 'bcryptjs';
 
 import { DataController } from '@root/data-controllers/interfaces';
-import { InvalidPasswordException, UserExistsException, InvalidUsernameException } from '@root/exceptions/user-exceptions';
+import { InvalidPasswordException, UserExistsException, InvalidUsernameException, EmailExistsException } from '@root/exceptions/user-exceptions';
 import { BlogPost, User, UserToken, CMSContext, NewUser, NewBlogPost } from '@dataTypes';
 import { BlogDoesNotExistException } from '@root/exceptions/blog-exceptions';
-import { fstat } from 'node:fs';
 
 class BasicDataController implements DataController {
   private _blogPosts: {[key: number]: BlogPost } = {};
@@ -59,7 +59,7 @@ class BasicDataController implements DataController {
         firstName: 'admin',
         lastName: 'admin',
         userType: this.cmsContext.userTypeMap.getUserType('SuperAdmin'),
-        passwordHash: 'password',
+        password: 'password',
       };
 
       const u2: NewUser = {
@@ -68,7 +68,7 @@ class BasicDataController implements DataController {
         firstName: 'writer',
         lastName: 'writer',
         userType: this.cmsContext.userTypeMap.getUserType('Writer'),
-        passwordHash: 'password',
+        password: 'password',
       };
 
       this.addUser(u1);
@@ -78,6 +78,16 @@ class BasicDataController implements DataController {
     this.initialized = true;
 
     return;
+  }
+
+  private getUserByEmail(email: string) {
+    for (const user of Object.values(this._users)) {
+      if (user.email === email) {
+        return user;
+      }
+    }
+
+    return null;
   }
 
   async getBlogPostBySlug(slug: string) {
@@ -147,7 +157,12 @@ class BasicDataController implements DataController {
     return null;
   }
 
-  async getUserById(userId: number) {
+  async getUserById(userId: string) {
+    const id = parseInt(userId, 10);
+
+    if (Number.isNaN(id)) {
+      return null;
+    }
     const user = this._users[userId];
 
     if (typeof(user) === 'undefined') {
@@ -164,6 +179,8 @@ class BasicDataController implements DataController {
 
     const id = this.getNextUserId();
 
+    const hash = bcrypt.hashSync(user.password, 12);
+
     const u = new User(
       `${id}`,
       user.username,
@@ -171,7 +188,7 @@ class BasicDataController implements DataController {
       user.firstName,
       user.lastName,
       user.userType,
-      user.passwordHash,
+      hash,
     );
 
     this._users[id] = u;
@@ -183,8 +200,22 @@ class BasicDataController implements DataController {
   }
 
   async editUser(user: User): Promise<User> {
+
     if (!(user.id in this._users)) {
       throw new Error('User Does Not Exist');
+    }
+
+    // Check if username or email already exist
+    const emailUser = this.getUserByEmail(user.email);
+
+    if (emailUser !== null && emailUser?.id !== user.id) {
+      throw new EmailExistsException();
+    }
+
+    const usernameUser = await this.getUserByUsername(user.username);
+
+    if (usernameUser !== null && usernameUser?.id !== user.id) {
+      throw new UserExistsException();
     }
 
     this._users[user.id] = user;
@@ -192,6 +223,10 @@ class BasicDataController implements DataController {
     this.writeUserData();
 
     return user;
+  }
+
+  async updatePassword(userId: string, password: string) {
+    return;
   }
 
   async deleteUser(id: string) {
@@ -211,7 +246,7 @@ class BasicDataController implements DataController {
       throw new InvalidUsernameException();
     }
 
-    if (password !== user.passwordHash) {
+    if (!bcrypt.compareSync(password, user.passwordHash)) {
       throw new InvalidPasswordException();
     }
 

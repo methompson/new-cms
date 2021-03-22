@@ -29,6 +29,28 @@ class UserTypeMap {
   }
 
   /**
+   * Checks two user types and returns a number indicating firstEl's level's relative
+   * comparison to secondEl's level. If firstEl's level is greater than secondEl's,
+   * a positive value is returned. If firstEl's level is lower than secondEl's,
+   * a negative value is returned. Otherwise, 0 is returned.
+   *
+   * @param firstEl {UserType} The userType that we are using as a
+   * @param secondEl {UserType}
+   * @returns {Number}
+   */
+  compareUserTypeLevels(firstEl: UserType, secondEl: UserType): number {
+    if (firstEl.accessLevel > secondEl.accessLevel) {
+      return 1;
+    }
+
+    if (firstEl.accessLevel < secondEl.accessLevel) {
+      return -1;
+    }
+
+    return 0;
+  }
+
+  /**
    * This method will add a UserMap to the existing usermap.
    * This method enforces the default userTypes, so that we don't override the
    * Admin or SuperAdmin users.
