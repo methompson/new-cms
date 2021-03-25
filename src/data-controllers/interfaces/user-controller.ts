@@ -6,10 +6,15 @@ interface UserController {
   getUserById: (userId: string) => Promise<User | null>;
 
   addUser: (user: NewUser) => Promise<User>;
-  logUserIn: (username: string, password: string) => Promise<string>;
   editUser: (user: User) => Promise<User>;
   updatePassword: (userId: string, password: string) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
+  /**
+   * Returns a boolean indicating if there are no users. True means that
+   * there are no users in the data controller and the default users need
+   * to be added
+   */
+  isNoUsers: () => Promise<boolean>;
 }
 
 export default UserController;

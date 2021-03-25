@@ -1,7 +1,5 @@
-import * as jwt from 'jsonwebtoken';
 import { open, writeFile, mkdir } from 'fs/promises';
 import * as path from 'path';
-import * as bcrypt from 'bcryptjs';
 
 import { DataController } from '@root/data-controllers/interfaces';
 import { InvalidPasswordException, UserExistsException, InvalidUsernameException, EmailExistsException } from '@root/exceptions/user-exceptions';
@@ -50,29 +48,7 @@ class BasicDataController implements DataController {
     try {
       await this.readUserData();
     } catch(e) {
-
-      console.log('read user data catch', e);
-
-      const u1: NewUser = {
-        username: 'admin',
-        email: 'admin@admin.admin',
-        firstName: 'admin',
-        lastName: 'admin',
-        userType: this.cmsContext.userTypeMap.getUserType('SuperAdmin'),
-        password: 'password',
-      };
-
-      const u2: NewUser = {
-        username: 'writer',
-        email: 'writer@admin.admin',
-        firstName: 'writer',
-        lastName: 'writer',
-        userType: this.cmsContext.userTypeMap.getUserType('Writer'),
-        password: 'password',
-      };
-
-      this.addUser(u1);
-      this.addUser(u2);
+      console.log('Read error');
     }
 
     this.initialized = true;
@@ -179,8 +155,6 @@ class BasicDataController implements DataController {
 
     const id = this.getNextUserId();
 
-    const hash = bcrypt.hashSync(user.password, 12);
-
     const u = new User(
       `${id}`,
       user.username,
@@ -188,7 +162,7 @@ class BasicDataController implements DataController {
       user.firstName,
       user.lastName,
       user.userType,
-      hash,
+      user.passwordHash,
     );
 
     this._users[id] = u;
@@ -239,35 +213,14 @@ class BasicDataController implements DataController {
     this.writeUserData();
   }
 
-  async logUserIn(username: string, password: string): Promise<string> {
-    const user = await this.getUserByUsername(username);
-
-    if (user == null) {
-      throw new InvalidUsernameException();
-    }
-
-    if (!bcrypt.compareSync(password, user.passwordHash)) {
-      throw new InvalidPasswordException();
-    }
-
-    const secret = process.env.jwt_secret ?? 'default_secret';
-
-    console.log('login secret', secret);
-
-    const claims: UserToken = {
-      username: user.username,
-      userType: user.userType.name,
-      userId: user.id,
-    };
-
-    return jwt.sign(
-      claims,
-      secret,
-      {
-        algorithm: 'HS256',
-        expiresIn: '12h',
-      },
-    );
+  /**
+   * Returns a boolean indicating whether the user list has any users. If there
+   * are no users, this function returns true. It returns false otherwise.
+   *
+   * @returns Promises<boolean>
+   */
+  async isNoUsers(): Promise<boolean> {
+    return Object.keys(this._users).length === 0;
   }
 
   private containsUser(username: string, email: string): boolean {

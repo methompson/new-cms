@@ -1,6 +1,8 @@
 import * as Router from 'koa-router';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
 
-import { CMSContext, UserType, UserTypeMap, NewUser, User } from '@dataTypes';
+import { CMSContext, UserType, UserToken, UserTypeMap, NewUser, User } from '@dataTypes';
 import { DataController } from '@root/data-controllers/interfaces';
 import ErrorHandler from './error-handler';
 import { useRouteProtection } from './route-protection';
@@ -25,6 +27,7 @@ class CMS extends ErrorHandler {
 
   async init(dataController: DataController, options?: any) {
     this.dataController = dataController;
+
     const userTypeMap = new UserTypeMap();
 
     this.context = {
@@ -36,6 +39,28 @@ class CMS extends ErrorHandler {
     if (this.dataController.initialized === false) {
       throw new InvalidDataControllerException();
     }
+
+    this.dataController.isNoUsers()
+      .then(async (res) => {
+        if (res === true) {
+          console.log('There are no users');
+
+          const u: NewUser = {
+            username: 'admin',
+            email: 'admin@admin.admin',
+            firstName: 'admin',
+            lastName: 'admin',
+            userType: this.context.userTypeMap.getUserType('SuperAdmin'),
+            passwordHash: this.hashPassword('password'),
+          };
+
+          try {
+            await this.dataController.addUser(u);
+          } catch (e) {
+            console.log('Error adding new user');
+          }
+        }
+      });
 
     this.blogRouter = this.initBlogRouter();
     this.userRouter = this.initUserRouter();
@@ -126,6 +151,13 @@ class CMS extends ErrorHandler {
     );
 
     r.post(
+      '/updatePassword',
+      useRouteProtection(),
+      async (ctx, next) => this.filterByUserType(ctx, next, adminUserType),
+      async (ctx, next) => this.updatePassword(ctx, next),
+    );
+
+    r.post(
       '/delete',
       useRouteProtection(),
       async (ctx, next) => this.filterByUserType(ctx, next, adminUserType),
@@ -133,6 +165,10 @@ class CMS extends ErrorHandler {
     );
 
     return r;
+  }
+
+  private hashPassword(password: string): string {
+    return bcrypt.hashSync(password, 12);
   }
 
   /**
@@ -166,13 +202,34 @@ class CMS extends ErrorHandler {
       return;
     }
 
-    let token: string;
-    try {
-      token = await this.dataController.logUserIn(body.username, body.password);
-    } catch(e) {
+    const user = await this.dataController.getUserByUsername(body.username);
+
+    if (user == null) {
       this.send401Error(ctx, 'Invalid Credentials');
       return;
     }
+
+    if (!bcrypt.compareSync(body.password, user.passwordHash)) {
+      this.send401Error(ctx, 'Invalid Credentials');
+      return;
+    }
+
+    const secret = process.env.jwt_secret ?? 'default_secret';
+
+    const claims: UserToken = {
+      username: user.username,
+      userType: user.userType.name,
+      userId: user.id,
+    };
+
+    const token: string = jwt.sign(
+      claims,
+      secret,
+      {
+        algorithm: 'HS256',
+        expiresIn: '12h',
+      },
+    );
 
     ctx.body = {
       token,
@@ -240,22 +297,31 @@ class CMS extends ErrorHandler {
 
     let u: NewUser;
 
+    // Let's construct a new user to make sure the user inputs are correct
     try {
+      // Let's hash a password first.
+      if (typeof newUser?.password !== 'string') {
+        throw new Error();
+      }
+
+      const password = this.hashPassword(newUser.password);
+
       u = NewUser.fromJson({
-        username: newUser.username,
-        email: newUser.email,
-        password: newUser.password,
-        firstName: newUser.firstName ?? '',
-        lastName: newUser.lastName ?? '',
-        userType: newUser.userType ?? '',
+        username: newUser?.username,
+        email: newUser?.email,
+        password,
+        firstName: newUser?.firstName ?? '',
+        lastName: newUser?.lastName ?? '',
+        userType: newUser?.userType ?? '',
       }, this.context.userTypeMap);
     } catch(e) {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
 
+    // If we get here, let's construct a regular user and hash the
+    // new user's password.
     let savedUser: User;
-
 
     try {
       savedUser = await this.dataController.addUser(u);
@@ -293,8 +359,9 @@ class CMS extends ErrorHandler {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
+
     // We prevent a user from editing a user of a higher level. e.g. admin user types
-    // cannot delete super admins.
+    // cannot edit super admins.
     const currentEditedUser = await this.dataController.getUserById(body.id);
     if (currentEditedUser === null) {
       this.send400Error(ctx, 'User does not exist');
@@ -303,9 +370,17 @@ class CMS extends ErrorHandler {
 
     const userTypeMap = this.context.userTypeMap;
 
-    // There should be no problem here. We use filterByUserType to make sure that the
-    // userType actually exists.
-    const requester = ctx?.state?.user;
+    // We use filterByUserType to make sure that the userType actually exists.
+    let requester: UserToken;
+
+    try {
+      requester = UserToken.parse(ctx?.state?.user);
+    } catch(e) {
+      // We're unlikely to hit this, but just in case...
+      this.send400Error(ctx, 'Invalid JWT');
+      return;
+    }
+
     const requesterType = userTypeMap.getUserType(requester?.userType);
 
     // compareUserTypeLevels will compare the first userType to the second. If the first
@@ -360,6 +435,72 @@ class CMS extends ErrorHandler {
       } else {
         msg += `$e`;
       }
+
+      this.send400Error(ctx, msg);
+      return;
+    }
+
+    ctx.body = {
+      id: result.id,
+      username: result.username,
+      email: result.email,
+      firstName: result.firstName,
+      lastName: result.lastName,
+      userType: result.userType.name,
+    };
+
+    next();
+  }
+
+  private async updatePassword(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const body = ctx?.request?.body;
+
+    if (typeof body?.id !== 'string' || typeof body?.password !== 'string') {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    // We prevent a user from editing a user of a higher level. e.g. admin user types
+    // cannot edit super admins.
+    const currentEditedUser = await this.dataController.getUserById(body.id);
+    if (currentEditedUser === null) {
+      this.send400Error(ctx, 'User does not exist');
+      return;
+    }
+
+    const userTypeMap = this.context.userTypeMap;
+
+    // We use filterByUserType to make sure that the userType actually exists.
+    let requester: UserToken;
+
+    try {
+      requester = UserToken.parse(ctx?.state?.user);
+    } catch(e) {
+      // We're unlikely to hit this, but just in case...
+      this.send400Error(ctx, 'Invalid JWT');
+      return;
+    }
+
+    const requesterType = userTypeMap.getUserType(requester?.userType);
+
+    // compareUserTypeLevels will compare the first userType to the second. If the first
+    // is lower than the second, it will return a value less than 1.
+    if (userTypeMap.compareUserTypeLevels(requesterType, currentEditedUser.userType) < 0) {
+      this.send400Error(ctx, 'Cannot edit a user of a higher level');
+      return;
+    }
+
+    const editedUser: User = {
+      ...currentEditedUser,
+      passwordHash: this.hashPassword(body.password),
+    };
+
+    let result: User;
+
+    try {
+      result = await this.dataController.editUser(editedUser);
+    } catch (e) {
+      const msg = `$e`;
 
       this.send400Error(ctx, msg);
       return;

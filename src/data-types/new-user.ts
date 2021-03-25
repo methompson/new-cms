@@ -1,18 +1,14 @@
-import { UserTypeMap } from '@dataTypes';
-import UserType from './usertype';
-import UserBase from './user-base';
+import { UserTypeMap, UserType } from '@dataTypes';
 
-class NewUser extends UserBase {
+class NewUser {
   constructor(
-    username: string,
-    email: string,
-    firstName: string,
-    lastName: string,
-    userType: UserType,
-    public password: string,
-  ) {
-    super(username, email, firstName, lastName, userType);
-  }
+    public username: string,
+    public email: string,
+    public firstName: string,
+    public lastName: string,
+    public userType: UserType,
+    public passwordHash: string,
+  ) {}
 
   static fromJson(rawJson: any, userTypeMap: UserTypeMap): NewUser {
     const isUser = (val: any): boolean => {
