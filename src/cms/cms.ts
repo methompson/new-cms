@@ -2,13 +2,24 @@ import * as Router from 'koa-router';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 
-import { CMSContext, UserType, UserToken, UserTypeMap, NewUser, User } from '@dataTypes';
+import {
+  CMSContext,
+  UserType,
+  UserToken,
+  UserTypeMap,
+  NewUser,
+  User,
+  NewBlogPost,
+  BlogPost,
+  EditBlogPost
+} from '@dataTypes';
 import { DataController } from '@root/data-controllers/interfaces';
 import ErrorHandler from './error-handler';
 import { useRouteProtection } from './route-protection';
 import { ParameterizedContext } from 'koa';
 import { EmailExistsException, InsufficientPermissionsException, UserExistsException } from '@root/exceptions/user-exceptions';
 import { InvalidDataControllerException } from '@root/exceptions/cms-exceptions';
+import { BlogAlreadyExistsException, BlogDoesNotExistException } from '@root/exceptions/blog-exceptions';
 
 class CMS extends ErrorHandler {
   dataController: DataController;
@@ -584,32 +595,106 @@ class CMS extends ErrorHandler {
   }
 
   private async getBlogPostBySlug(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const body = ctx?.request?.body;
+
+    if (typeof body?.slug !== 'string') {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    const post = await this.dataController.getBlogPostBySlug(body.slug);
+
+    if (post == null) {
+      this.send404Error(ctx, 'Blog Post Does Not Exist');
+      return;
+    }
+
     ctx.body = {
-      msg: '/slug',
+      blogPost: {
+        ...post,
+      },
     };
 
     next();
   }
 
   private async addNewBlogPost(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const postData = ctx?.request?.body?.blogPost;
+
+    let p: NewBlogPost;
+
+    try {
+      p = NewBlogPost.fromJson(postData);
+    } catch(e) {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    let savedPost: BlogPost;
+    try {
+      savedPost = await this.dataController.addBlogPost(p);
+    } catch(e) {
+      this.send400Error(ctx, 'Add error');
+      return;
+    }
+
     ctx.body = {
-      msg: '/add',
+      ...savedPost,
     };
 
     next();
   }
 
   private async editBlogPost(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const postData = ctx?.request?.body?.blogPost;
+
+    let p: EditBlogPost;
+
+    try {
+      p = EditBlogPost.fromJson(postData);
+    } catch(e) {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    let savedPost: BlogPost;
+    try {
+      savedPost = await this.dataController.editBlogPost(p);
+    } catch(e) {
+      let errMsg = 'Add Error';
+      if (e instanceof BlogDoesNotExistException) {
+        errMsg += ': Blog entry does not exist';
+      } else if (e instanceof BlogAlreadyExistsException) {
+        errMsg += ': Blog Slug already exists';
+      }
+      this.send400Error(ctx, errMsg);
+      return;
+    }
+
     ctx.body = {
-      msg: '/edit',
+      ...savedPost,
     };
 
     next();
   }
 
   private async deleteBlogPost(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const body = ctx?.request?.body;
+
+    if (typeof body?.id !== 'string') {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    try {
+      await this.dataController.deleteBlogPost(body.id);
+    } catch(e) {
+      this.send400Error(ctx, 'Blog Post Does Not Exist');
+      return;
+    }
+
     ctx.body = {
-      msg: '/delete',
+      msg: `Blog Post id ${body.id} deleted`,
     };
 
     next();

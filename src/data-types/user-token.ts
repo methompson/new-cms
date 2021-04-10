@@ -1,5 +1,3 @@
-import { UserTypeMap, UserType } from '@dataTypes';
-
 class UserToken {
   constructor(
     public username: string,

@@ -1,3 +1,5 @@
+// tslint:disable:max-classes-per-file
+
 /**
  * This exception is meant to be thrown when attempting to edit a blog post and the blog
  * post doesn't exist already.
@@ -9,6 +11,22 @@ class BlogDoesNotExistException extends Error {
   }
 }
 
+class BlogAlreadyExistsException extends Error {
+  constructor() {
+    super();
+    Object.setPrototypeOf(this, BlogAlreadyExistsException.prototype);
+  }
+}
+
+class BlogSlugExistsException extends Error {
+  constructor() {
+    super();
+    Object.setPrototypeOf(this, BlogSlugExistsException.prototype);
+  }
+}
+
 export {
   BlogDoesNotExistException,
+  BlogAlreadyExistsException,
+  BlogSlugExistsException,
 }

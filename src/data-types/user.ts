@@ -17,17 +17,11 @@ class User extends NewUser {
 
   static fromJson(rawJson: any, userTypeMap: UserTypeMap): User {
     const isUser = (val: any): boolean => {
-      if (typeof val === 'object'
-        && 'username' in val
-        && typeof val.username === 'string'
-        && 'email' in val
-        && typeof val.email === 'string'
-        && 'userType' in val
-        && typeof val.userType === 'string'
-        && 'passwordHash' in val
-        && typeof val.passwordHash === 'string'
-        && 'id' in val
-        && typeof val.id === 'string'
+      if (typeof val?.username === 'string'
+        && typeof val?.email === 'string'
+        && typeof val?.userType === 'string'
+        && typeof val?.passwordHash === 'string'
+        && typeof val?.id === 'string'
       ) {
         return true;
       }

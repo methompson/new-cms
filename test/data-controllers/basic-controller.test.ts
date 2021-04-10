@@ -1,6 +1,6 @@
 import * as jwt from 'jsonwebtoken';
 
-import BasicDataController from '../../src/data-controllers/basic-controller';
+import { BasicDataController } from '../../src/data-controllers/basic-controller';
 import { UserType, User, UserToken, UserTypeMap, NewUser, NewBlogPost, BlogPost } from '../../src/data-types';
 import { InvalidPasswordException, InvalidUsernameException } from '../../src/exceptions/user-exceptions';
 import { BlogDoesNotExistException } from '../../src/exceptions/blog-exceptions';

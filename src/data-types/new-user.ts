@@ -12,13 +12,9 @@ class NewUser {
 
   static fromJson(rawJson: any, userTypeMap: UserTypeMap): NewUser {
     const isUser = (val: any): boolean => {
-      if (typeof val === 'object'
-        && 'username' in val
-        && typeof val.username === 'string'
-        && 'email' in val
-        && typeof val.email === 'string'
-        && 'password' in val
-        && typeof val.password === 'string'
+      if ( typeof val?.username === 'string'
+        && typeof val?.email === 'string'
+        && typeof val?.password === 'string'
       ) {
         return true;
       }

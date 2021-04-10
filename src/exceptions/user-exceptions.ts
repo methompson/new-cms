@@ -1,3 +1,5 @@
+// tslint:disable:max-classes-per-file
+
 /**
  * This exception is meant to be thrown when attempting to add a user with a username
  * that already exists.
@@ -9,7 +11,6 @@ class UserExistsException extends Error {
   }
 }
 
-// tslint:disable-next-line:max-classes-per-file
 class EmailExistsException extends Error {
   constructor() {
     super();
@@ -17,7 +18,6 @@ class EmailExistsException extends Error {
   }
 }
 
-// tslint:disable-next-line:max-classes-per-file
 class InvalidUsernameException extends Error {
   constructor() {
     super();
@@ -25,7 +25,6 @@ class InvalidUsernameException extends Error {
   }
 }
 
-// tslint:disable-next-line:max-classes-per-file
 class InvalidPasswordException extends Error {
   constructor() {
     super();
@@ -33,7 +32,6 @@ class InvalidPasswordException extends Error {
   }
 }
 
-// tslint:disable-next-line:max-classes-per-file
 class InsufficientPermissionsException extends Error {
   constructor() {
     super();
