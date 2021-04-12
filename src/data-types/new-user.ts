@@ -8,6 +8,8 @@ class NewUser {
     public lastName: string,
     public userType: UserType,
     public passwordHash: string,
+    public userMeta: {[key: string]: any},
+    public enabled: boolean,
   ) {}
 
   static fromJson(rawJson: any, userTypeMap: UserTypeMap): NewUser {
@@ -26,13 +28,18 @@ class NewUser {
       throw new Error('Invalid Data');
     }
 
+    const userMeta = typeof rawJson.userMeta === 'object' ? rawJson.userMeta : {};
+    const enabled = typeof rawJson.enabled === 'boolean' ? rawJson.enabled : true;
+
     const user = new NewUser(
       rawJson.username,
-      rawJson.email ?? '',
+      rawJson.email,
       rawJson.firstName ?? '',
       rawJson.lastName ?? '',
       userTypeMap.getUserType(rawJson.userType),
       rawJson.password,
+      userMeta,
+      enabled,
     );
 
     return user;

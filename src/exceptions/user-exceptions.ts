@@ -11,6 +11,13 @@ class UserExistsException extends Error {
   }
 }
 
+class UserDoesNotExistException extends Error {
+  constructor() {
+    super();
+    Object.setPrototypeOf(this, UserDoesNotExistException.prototype);
+  }
+}
+
 class EmailExistsException extends Error {
   constructor() {
     super();
@@ -22,6 +29,13 @@ class InvalidUsernameException extends Error {
   constructor() {
     super();
     Object.setPrototypeOf(this, InvalidUsernameException.prototype);
+  }
+}
+
+class InvalidUserIdException extends Error {
+  constructor() {
+    super();
+    Object.setPrototypeOf(this, InvalidUserIdException.prototype);
   }
 }
 
@@ -41,8 +55,10 @@ class InsufficientPermissionsException extends Error {
 
 export {
   UserExistsException,
+  UserDoesNotExistException,
   EmailExistsException,
   InvalidUsernameException,
+  InvalidUserIdException,
   InvalidPasswordException,
   InsufficientPermissionsException,
 }

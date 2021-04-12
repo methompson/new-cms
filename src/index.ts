@@ -11,7 +11,7 @@ import * as json from 'koa-json';
 import * as bodyParser from 'koa-bodyparser';
 
 import { CMS } from './cms';
-import { BasicDataController } from './data-controllers';
+import { BasicDataController, MySQLDataController } from './data-controllers';
 
 /**
  * The app initialization is asynchronous, so we wrap all of our main app
@@ -28,12 +28,20 @@ import { BasicDataController } from './data-controllers';
   let cms: CMS;
 
   try {
-    const dc = new BasicDataController({
+    const bdc = new BasicDataController({
       'dataLocation': './data/',
     });
 
+    const mysqlDC = new MySQLDataController({
+      host: 'localhost',
+      dbName: 'kcms',
+      user: 'cms_user',
+      password: 'cms_pw',
+      port: 3306,
+    });
+
     cms = new CMS();
-    await cms.init(dc);
+    await cms.init(mysqlDC);
   } catch (e) {
     // handle accordingly
     console.log('Unable to instance data controller', e);

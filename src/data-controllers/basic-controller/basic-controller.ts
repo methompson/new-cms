@@ -2,9 +2,24 @@ import { open, writeFile, mkdir } from 'fs/promises';
 import * as path from 'path';
 
 import { DataController } from '@root/data-controllers/interfaces';
-import { UserExistsException, InvalidUsernameException, EmailExistsException } from '@root/exceptions/user-exceptions';
-import { BlogPost, User, UserToken, CMSContext, NewUser, NewBlogPost } from '@dataTypes';
-import { BlogDoesNotExistException, BlogSlugExistsException, BlogAlreadyExistsException } from '@root/exceptions/blog-exceptions';
+import {
+  UserExistsException,
+  InvalidUsernameException,
+  EmailExistsException,
+  InvalidUserIdException
+} from '@root/exceptions/user-exceptions';
+import {
+  BlogPost,
+  User,
+  CMSContext,
+  NewUser,
+  NewBlogPost
+} from '@dataTypes';
+import {
+  BlogDoesNotExistException,
+  BlogSlugExistsException,
+  BlogAlreadyExistsException
+} from '@root/exceptions/blog-exceptions';
 
 class BasicDataController implements DataController {
   private _blogPosts: {[key: string]: BlogPost } = {};
@@ -181,19 +196,20 @@ class BasicDataController implements DataController {
       }
     }
 
-    return null;
+    throw new InvalidUsernameException();
   }
 
   async getUserById(userId: string) {
     const id = parseInt(userId, 10);
 
     if (Number.isNaN(id)) {
-      return null;
+      throw new InvalidUserIdException()
     }
+
     const user = this._users[userId];
 
     if (typeof(user) === 'undefined') {
-      return null;
+      throw new InvalidUserIdException()
     }
 
     return user;
@@ -206,6 +222,8 @@ class BasicDataController implements DataController {
 
     const id = this.getNextUserId();
 
+    const now = Date.now();
+
     const u = new User(
       `${id}`,
       user.username,
@@ -214,6 +232,12 @@ class BasicDataController implements DataController {
       user.lastName,
       user.userType,
       user.passwordHash,
+      user.userMeta,
+      user.enabled,
+      '',
+      now,
+      now,
+      now,
     );
 
     this._users[id] = u;

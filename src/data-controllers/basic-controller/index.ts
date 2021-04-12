@@ -1,5 +1,3 @@
 import BasicDataController from './basic-controller';
 
-export {
-  BasicDataController,
-};
+export default BasicDataController;

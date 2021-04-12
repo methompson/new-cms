@@ -54,7 +54,6 @@ class CMS extends ErrorHandler {
     this.dataController.isNoUsers()
       .then(async (res) => {
         if (res === true) {
-          console.log('There are no users');
 
           const u: NewUser = {
             username: 'admin',
@@ -63,6 +62,8 @@ class CMS extends ErrorHandler {
             lastName: 'admin',
             userType: this.context.userTypeMap.getUserType('SuperAdmin'),
             passwordHash: this.hashPassword('password'),
+            userMeta: {},
+            enabled: true,
           };
 
           try {
@@ -200,7 +201,7 @@ class CMS extends ErrorHandler {
       return;
     }
 
-    next();
+    await next();
   }
 
   private async logUserIn(ctx: ParameterizedContext, next: () => Promise<any>) {
@@ -213,9 +214,10 @@ class CMS extends ErrorHandler {
       return;
     }
 
-    const user = await this.dataController.getUserByUsername(body.username);
-
-    if (user == null) {
+    let user: User;
+    try {
+      user = await this.dataController.getUserByUsername(body.username);
+    } catch(e) {
       this.send401Error(ctx, 'Invalid Credentials');
       return;
     }
@@ -257,9 +259,10 @@ class CMS extends ErrorHandler {
       return;
     }
 
-    const user = await this.dataController.getUserById(body.id);
-
-    if (user == null) {
+    let user: User;
+    try {
+      user = await this.dataController.getUserById(body.id);
+    } catch(e) {
       this.send400Error(ctx, 'Invalid user ID provided');
       return;
     }
@@ -271,7 +274,7 @@ class CMS extends ErrorHandler {
       email: user.email,
     };
 
-    next();
+    await next();
   }
 
   private async getUserByUserName(ctx: ParameterizedContext, next: () => Promise<any>) {
@@ -282,9 +285,12 @@ class CMS extends ErrorHandler {
       return;
     }
 
-    const user = await this.dataController.getUserByUsername(body.username);
+    let user: User;
 
-    if (user == null) {
+    try {
+      user = await this.dataController.getUserByUsername(body.username);
+
+    } catch (e) {
       this.send400Error(ctx, 'Invalid username provided');
       return;
     }
@@ -318,12 +324,8 @@ class CMS extends ErrorHandler {
       const password = this.hashPassword(newUser.password);
 
       u = NewUser.fromJson({
-        username: newUser?.username,
-        email: newUser?.email,
+        ...newUser,
         password,
-        firstName: newUser?.firstName ?? '',
-        lastName: newUser?.lastName ?? '',
-        userType: newUser?.userType ?? '',
       }, this.context.userTypeMap);
     } catch(e) {
       this.send400Error(ctx, 'Invalid data provided');
@@ -333,6 +335,7 @@ class CMS extends ErrorHandler {
     // If we get here, let's construct a regular user and hash the
     // new user's password.
     let savedUser: User;
+
 
     try {
       savedUser = await this.dataController.addUser(u);
@@ -354,7 +357,7 @@ class CMS extends ErrorHandler {
       userType: savedUser.userType.name,
     };
 
-    next();
+    await next();
   }
 
   /**
@@ -373,8 +376,10 @@ class CMS extends ErrorHandler {
 
     // We prevent a user from editing a user of a higher level. e.g. admin user types
     // cannot edit super admins.
-    const currentEditedUser = await this.dataController.getUserById(body.id);
-    if (currentEditedUser === null) {
+    let currentEditedUser: User;
+    try {
+      currentEditedUser = await this.dataController.getUserById(body.id);
+    } catch(e) {
       this.send400Error(ctx, 'User does not exist');
       return;
     }
@@ -431,6 +436,12 @@ class CMS extends ErrorHandler {
       body?.lastName ?? currentEditedUser.lastName,
       newUserType,
       currentEditedUser.passwordHash,
+      body?.userMeta ?? currentEditedUser.userMeta,
+      body?.enabled ?? currentEditedUser.enabled,
+      currentEditedUser.passwordResetToken,
+      currentEditedUser.passwordResetDate,
+      currentEditedUser.dateAdded,
+      Date.now(),
     );
 
     let result: User;
@@ -473,8 +484,10 @@ class CMS extends ErrorHandler {
 
     // We prevent a user from editing a user of a higher level. e.g. admin user types
     // cannot edit super admins.
-    const currentEditedUser = await this.dataController.getUserById(body.id);
-    if (currentEditedUser === null) {
+    let currentEditedUser: User;
+    try {
+      currentEditedUser = await this.dataController.getUserById(body.id);
+    } catch(e) {
       this.send400Error(ctx, 'User does not exist');
       return;
     }
@@ -546,8 +559,10 @@ class CMS extends ErrorHandler {
 
     // We prevent a user from deleting a user of a higher level. e.g. admin user types
     // cannot delete super admins.
-    const deletedUser = await this.dataController.getUserById(body.id);
-    if (deletedUser === null) {
+    let deletedUser: User;
+    try {
+      deletedUser = await this.dataController.getUserById(body.id);
+    } catch(e) {
       this.send400Error(ctx, 'User does not exist');
       return;
     }
