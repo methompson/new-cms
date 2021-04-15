@@ -23,7 +23,7 @@ class NewBlogPost extends BlogBase {
     super(title, titleSlug, content, preview, author);
   }
 
-  static fromJson(rawJson: any) {
+  static fromJson(rawJson: any): NewBlogPost {
     const isNewBlog = (val: any): boolean => {
       if (typeof val?.title === 'string'
         && typeof val?.titleSlug === 'string'
@@ -107,23 +107,8 @@ class BlogPost extends NewBlogPost {
 
     return blog;
   }
-}
 
-class EditBlogPost extends BlogPost {
-  constructor(
-    id: string,
-    title: string,
-    titleSlug: string,
-    content: string,
-    preview: string,
-    author: string,
-    publishDate: number,
-    updateDate: number,
-  ) {
-    super(id, title, titleSlug, content, preview, author, publishDate, updateDate);
-  }
-
-  static fromJson(rawJson: any): EditBlogPost {
+  static fromEditJson(rawJson: any): BlogPost {
     const isBlog = (val: any): boolean => {
       if (typeof val === 'object'
         && typeof val?.id === 'string'
@@ -146,7 +131,7 @@ class EditBlogPost extends BlogPost {
 
     const updateDate = rawJson?.updateDate ?? Date.now();
 
-    const blog = new EditBlogPost(
+    const blog = new BlogPost(
       rawJson.id,
       rawJson.title,
       rawJson.titleSlug,
@@ -164,5 +149,4 @@ class EditBlogPost extends BlogPost {
 export {
   BlogPost,
   NewBlogPost,
-  EditBlogPost,
 };

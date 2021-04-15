@@ -42,6 +42,7 @@ import { BasicDataController, MySQLDataController } from './data-controllers';
 
     cms = new CMS();
     await cms.init(mysqlDC);
+    // await cms.init(bdc);
   } catch (e) {
     // handle accordingly
     console.log('Unable to instance data controller', e);
@@ -57,7 +58,7 @@ import { BasicDataController, MySQLDataController } from './data-controllers';
         if (401 === err.status) {
           ctx.status = 401;
           ctx.body = {
-            error: 'Protected resource. Use Authorization header to get access'
+            error: 'Protected resource. Use Authorization header to get access',
           };
         } else {
           throw err;
@@ -72,7 +73,7 @@ import { BasicDataController, MySQLDataController } from './data-controllers';
       };
 
       await next();
-    }
+    },
   );
 
   app

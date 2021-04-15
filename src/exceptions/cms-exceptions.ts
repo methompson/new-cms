@@ -1,24 +1,24 @@
 // tslint:disable:max-classes-per-file
 
 class InvalidDataControllerException extends Error {
-  constructor() {
-    super();
+  constructor(...params) {
+    super(...params);
 
     Object.setPrototypeOf(this, InvalidDataControllerException.prototype);
   }
 }
 
 class InvalidDataControllerConfigException extends Error {
-  constructor() {
-    super();
+  constructor(...params) {
+    super(...params);
 
     Object.setPrototypeOf(this, InvalidDataControllerConfigException.prototype);
   }
 }
 
 class UnimplementedMethodException extends Error {
-  constructor() {
-    super();
+  constructor(...params) {
+    super(...params);
 
     Object.setPrototypeOf(this, InvalidDataControllerConfigException.prototype);
   }

@@ -11,7 +11,6 @@ import {
   User,
   NewBlogPost,
   BlogPost,
-  EditBlogPost
 } from '@dataTypes';
 import { DataController } from '@root/data-controllers/interfaces';
 import ErrorHandler from './error-handler';
@@ -32,6 +31,9 @@ class CMS extends ErrorHandler {
 
   theContext: CMS;
 
+  // 15 minute timeout for password tokens
+  private PASSWORD_TOKEN_TIMEOUT: number = 1000 * 60 * 15;
+
   constructor() {
     super();
   }
@@ -51,28 +53,26 @@ class CMS extends ErrorHandler {
       throw new InvalidDataControllerException();
     }
 
-    this.dataController.isNoUsers()
-      .then(async (res) => {
-        if (res === true) {
+    try {
+      const isNoUsers = await this.dataController.userController.isNoUsers();
+      if (isNoUsers) {
+        const u: NewUser = {
+          username: 'admin',
+          email: 'admin@admin.admin',
+          firstName: 'admin',
+          lastName: 'admin',
+          userType: this.context.userTypeMap.getUserType('SuperAdmin'),
+          passwordHash: this.hashPassword('password'),
+          userMeta: {},
+          enabled: true,
+        };
 
-          const u: NewUser = {
-            username: 'admin',
-            email: 'admin@admin.admin',
-            firstName: 'admin',
-            lastName: 'admin',
-            userType: this.context.userTypeMap.getUserType('SuperAdmin'),
-            passwordHash: this.hashPassword('password'),
-            userMeta: {},
-            enabled: true,
-          };
-
-          try {
-            await this.dataController.addUser(u);
-          } catch (e) {
-            console.log('Error adding new user');
-          }
-        }
-      });
+        await this.dataController.userController.addUser(u);
+      }
+    } catch(e) {
+      console.log(`Error during init: ${e}`);
+      process.exit();
+    }
 
     this.blogRouter = this.initBlogRouter();
     this.userRouter = this.initUserRouter();
@@ -91,33 +91,33 @@ class CMS extends ErrorHandler {
 
     r.get(
       '/id',
-      async (ctx, next) => this.getBlogPostById(ctx, next)
+      async (ctx, next) => this.getBlogPostById(ctx, next),
     );
 
     r.get(
       '/slug',
-      async (ctx, next) => this.getBlogPostBySlug(ctx, next)
+      async (ctx, next) => this.getBlogPostBySlug(ctx, next),
     );
 
     r.post(
       '/add',
       useRouteProtection(),
       async (ctx, next) => this.filterByUserType(ctx, next, writerUserType),
-      async (ctx, next) => this.addNewBlogPost(ctx, next)
+      async (ctx, next) => this.addNewBlogPost(ctx, next),
     );
 
     r.post(
       '/edit',
       useRouteProtection(),
       async (ctx, next) => this.filterByUserType(ctx, next, writerUserType),
-      async (ctx, next) => this.editBlogPost(ctx, next)
+      async (ctx, next) => this.editBlogPost(ctx, next),
     );
 
     r.post(
       '/delete',
       useRouteProtection(),
       async (ctx, next) => this.filterByUserType(ctx, next, writerUserType),
-      async (ctx, next) => this.deleteBlogPost(ctx, next)
+      async (ctx, next) => this.deleteBlogPost(ctx, next),
     );
 
     return r;
@@ -170,6 +170,18 @@ class CMS extends ErrorHandler {
     );
 
     r.post(
+      '/updatePasswordWithToken',
+      async (ctx, next) => this.filterByUserType(ctx, next, adminUserType),
+      async (ctx, next) => this.updatePasswordWithToken(ctx, next),
+    );
+
+    r.post(
+      '/getPasswordResetToken',
+      async (ctx, next) => this.filterByUserType(ctx, next, adminUserType),
+      async (ctx, next) => this.getPasswordResetToken(ctx, next),
+    );
+
+    r.post(
       '/delete',
       useRouteProtection(),
       async (ctx, next) => this.filterByUserType(ctx, next, adminUserType),
@@ -216,8 +228,13 @@ class CMS extends ErrorHandler {
 
     let user: User;
     try {
-      user = await this.dataController.getUserByUsername(body.username);
+      user = await this.dataController.userController.getUserByUsername(body.username);
     } catch(e) {
+      this.send401Error(ctx, 'Invalid Credentials');
+      return;
+    }
+
+    if (user.enabled !== true) {
       this.send401Error(ctx, 'Invalid Credentials');
       return;
     }
@@ -261,7 +278,7 @@ class CMS extends ErrorHandler {
 
     let user: User;
     try {
-      user = await this.dataController.getUserById(body.id);
+      user = await this.dataController.userController.getUserById(body.id);
     } catch(e) {
       this.send400Error(ctx, 'Invalid user ID provided');
       return;
@@ -288,7 +305,7 @@ class CMS extends ErrorHandler {
     let user: User;
 
     try {
-      user = await this.dataController.getUserByUsername(body.username);
+      user = await this.dataController.userController.getUserByUsername(body.username);
 
     } catch (e) {
       this.send400Error(ctx, 'Invalid username provided');
@@ -338,7 +355,7 @@ class CMS extends ErrorHandler {
 
 
     try {
-      savedUser = await this.dataController.addUser(u);
+      savedUser = await this.dataController.userController.addUser(u);
     } catch (e) {
       if (e instanceof UserExistsException) {
         this.send400Error(ctx, `Username or email already exists`);
@@ -367,7 +384,7 @@ class CMS extends ErrorHandler {
    * @returns
    */
   private async editUser(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body;
+    const body = ctx?.request?.body?.user;
 
     if (typeof body?.id !== 'string') {
       this.send400Error(ctx, 'Invalid data provided');
@@ -378,7 +395,7 @@ class CMS extends ErrorHandler {
     // cannot edit super admins.
     let currentEditedUser: User;
     try {
-      currentEditedUser = await this.dataController.getUserById(body.id);
+      currentEditedUser = await this.dataController.userController.getUserById(body.id);
     } catch(e) {
       this.send400Error(ctx, 'User does not exist');
       return;
@@ -447,7 +464,7 @@ class CMS extends ErrorHandler {
     let result: User;
 
     try {
-      result = await this.dataController.editUser(editedUser);
+      result = await this.dataController.userController.editUser(editedUser);
     } catch (e) {
       let msg: string = '';
       if (e instanceof EmailExistsException) {
@@ -455,7 +472,7 @@ class CMS extends ErrorHandler {
       } else if (e instanceof UserExistsException) {
         msg += 'Username already exists for another user.';
       } else {
-        msg += `$e`;
+        msg += `${e}`;
       }
 
       this.send400Error(ctx, msg);
@@ -475,23 +492,62 @@ class CMS extends ErrorHandler {
   }
 
   private async updatePassword(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body;
+    const body = ctx?.request?.body?.user;
 
-    if (typeof body?.id !== 'string' || typeof body?.password !== 'string') {
+    if (typeof body?.id !== 'string'
+      || typeof body?.newPassword !== 'string'
+      || typeof body?.oldPassword !== 'string') {
       this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    if (!this.validatePassword(body.newPassword)) {
+      this.send400Error(ctx, 'Invalid Password. Password must be 8 characters or longer');
       return;
     }
 
     // We prevent a user from editing a user of a higher level. e.g. admin user types
     // cannot edit super admins.
-    let currentEditedUser: User;
+    let user: User;
     try {
-      currentEditedUser = await this.dataController.getUserById(body.id);
+      user = await this.dataController.userController.getUserById(body.id);
     } catch(e) {
       this.send400Error(ctx, 'User does not exist');
       return;
     }
 
+    // We check the old password to make sure it's correct
+    if (!bcrypt.compareSync(body.oldPassword, user.passwordHash)) {
+      this.send401Error(ctx, 'Invalid Credentials');
+      return;
+    }
+
+    const userErr = this.canUpdatePassword(ctx, user);
+    if (userErr.length > 0) {
+      this.send400Error(ctx, userErr);
+      return;
+    }
+
+    try {
+      await this.dataController.userController.updatePassword(
+        body.id,
+        this.hashPassword(body.newPassword),
+      );
+    } catch (e) {
+      const msg = `${e}`;
+
+      this.send400Error(ctx, msg);
+      return;
+    }
+
+    ctx.body = {
+      message: 'Password Successfully Updated',
+    };
+
+    next();
+  }
+
+  private canUpdatePassword(ctx: ParameterizedContext, currentEditedUser: User): string {
     const userTypeMap = this.context.userTypeMap;
 
     // We use filterByUserType to make sure that the userType actually exists.
@@ -501,8 +557,7 @@ class CMS extends ErrorHandler {
       requester = UserToken.parse(ctx?.state?.user);
     } catch(e) {
       // We're unlikely to hit this, but just in case...
-      this.send400Error(ctx, 'Invalid JWT');
-      return;
+      return 'Invalid JWT';
     }
 
     const requesterType = userTypeMap.getUserType(requester?.userType);
@@ -510,40 +565,99 @@ class CMS extends ErrorHandler {
     // compareUserTypeLevels will compare the first userType to the second. If the first
     // is lower than the second, it will return a value less than 1.
     if (userTypeMap.compareUserTypeLevels(requesterType, currentEditedUser.userType) < 0) {
-      this.send400Error(ctx, 'Cannot edit a user of a higher level');
+      return 'Cannot edit a user of a higher level';
+    }
+
+    return '';
+  }
+
+  /**
+   * Used to validate whether a password is correct. Any rules that you want
+   * to apply to a password should be here
+   *
+   * @param newPassword string
+   * @returns boolean
+   */
+  private validatePassword(newPassword: string): boolean {
+    return newPassword.length >= 8;
+  }
+
+  private async getPasswordResetToken(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const body = ctx?.request?.body?.user;
+
+    if (typeof body?.id !== 'string'
+      || typeof body?.password !== 'string'
+    ) {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+  }
+
+  private async updatePasswordWithToken(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const body = ctx?.request?.body?.user;
+
+    if (typeof body?.id !== 'string'
+      || typeof body?.newPassword !== 'string'
+      || typeof body?.passwordToken !== 'string') {
+      this.send400Error(ctx, 'Invalid data provided');
       return;
     }
 
-    const editedUser: User = {
-      ...currentEditedUser,
-      passwordHash: this.hashPassword(body.password),
-    };
+    if (!this.validatePassword(body.newPassword)) {
+      this.send400Error(ctx, 'Invalid Password. Password must be 8 characters or longer');
+      return;
+    }
 
-    let result: User;
+    // We prevent a user from editing a user of a higher level. e.g. admin user types
+    // cannot edit super admins.
+    let user: User;
+    try {
+      user = await this.dataController.userController.getUserById(body.id);
+    } catch(e) {
+      this.send400Error(ctx, 'User does not exist');
+      return;
+    }
+
+    if (user.passwordResetToken !== body.passwordResetToken) {
+      this.send400Error(ctx, 'Invalid password reset token');
+      return;
+    }
+
+    const timeout: Date = new Date(Date.now() - this.PASSWORD_TOKEN_TIMEOUT);
+    const passwordResetDate = new Date(user.passwordResetDate);
+
+    if (passwordResetDate < timeout) {
+      this.send400Error(ctx, 'Password reset token has expired');
+      return;
+    }
+
+    const userErr = this.canUpdatePassword(ctx, user);
+    if (userErr.length > 0) {
+      this.send400Error(ctx, userErr);
+      return;
+    }
 
     try {
-      result = await this.dataController.editUser(editedUser);
+      await this.dataController.userController.updatePassword(
+        body.id,
+        this.hashPassword(body.password),
+      );
     } catch (e) {
-      const msg = `$e`;
+      const msg = `${e}`;
 
       this.send400Error(ctx, msg);
       return;
     }
 
     ctx.body = {
-      id: result.id,
-      username: result.username,
-      email: result.email,
-      firstName: result.firstName,
-      lastName: result.lastName,
-      userType: result.userType.name,
+      message: 'Password Successfully Updated',
     };
 
     next();
   }
 
   private async deleteUser(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body;
+    const body = ctx?.request?.body?.user;
 
     if (typeof body?.id !== 'string') {
       this.send400Error(ctx, 'Invalid data provided');
@@ -561,7 +675,7 @@ class CMS extends ErrorHandler {
     // cannot delete super admins.
     let deletedUser: User;
     try {
-      deletedUser = await this.dataController.getUserById(body.id);
+      deletedUser = await this.dataController.userController.getUserById(body.id);
     } catch(e) {
       this.send400Error(ctx, 'User does not exist');
       return;
@@ -579,7 +693,7 @@ class CMS extends ErrorHandler {
     }
 
     try {
-      await this.dataController.deleteUser(body.id);
+      await this.dataController.userController.deleteUser(body.id);
     } catch(e) {
       this.send400Error(ctx, 'User does not exist');
       return;
@@ -593,14 +707,14 @@ class CMS extends ErrorHandler {
   }
 
   private async getBlogPostById(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body;
+    const body = ctx?.request?.body?.blog;
 
     if (typeof body?.id !== 'string') {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
 
-    const post = await this.dataController.getBlogPostById(body.id);
+    const post = await this.dataController.blogController.getBlogPostById(body.id);
 
     ctx.body = {
       msg: '/id',
@@ -610,14 +724,14 @@ class CMS extends ErrorHandler {
   }
 
   private async getBlogPostBySlug(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body;
+    const body = ctx?.request?.body?.blog;
 
     if (typeof body?.slug !== 'string') {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
 
-    const post = await this.dataController.getBlogPostBySlug(body.slug);
+    const post = await this.dataController.blogController.getBlogPostBySlug(body.slug);
 
     if (post == null) {
       this.send404Error(ctx, 'Blog Post Does Not Exist');
@@ -634,7 +748,7 @@ class CMS extends ErrorHandler {
   }
 
   private async addNewBlogPost(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const postData = ctx?.request?.body?.blogPost;
+    const postData = ctx?.request?.body?.blog;
 
     let p: NewBlogPost;
 
@@ -647,7 +761,7 @@ class CMS extends ErrorHandler {
 
     let savedPost: BlogPost;
     try {
-      savedPost = await this.dataController.addBlogPost(p);
+      savedPost = await this.dataController.blogController.addBlogPost(p);
     } catch(e) {
       this.send400Error(ctx, 'Add error');
       return;
@@ -661,12 +775,12 @@ class CMS extends ErrorHandler {
   }
 
   private async editBlogPost(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const postData = ctx?.request?.body?.blogPost;
+    const postData = ctx?.request?.body?.blog;
 
-    let p: EditBlogPost;
+    let p: BlogPost;
 
     try {
-      p = EditBlogPost.fromJson(postData);
+      p = BlogPost.fromEditJson(postData);
     } catch(e) {
       this.send400Error(ctx, 'Invalid data provided');
       return;
@@ -674,7 +788,7 @@ class CMS extends ErrorHandler {
 
     let savedPost: BlogPost;
     try {
-      savedPost = await this.dataController.editBlogPost(p);
+      savedPost = await this.dataController.blogController.editBlogPost(p);
     } catch(e) {
       let errMsg = 'Add Error';
       if (e instanceof BlogDoesNotExistException) {
@@ -694,7 +808,7 @@ class CMS extends ErrorHandler {
   }
 
   private async deleteBlogPost(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body;
+    const body = ctx?.request?.body?.blog;
 
     if (typeof body?.id !== 'string') {
       this.send400Error(ctx, 'Invalid data provided');
@@ -702,7 +816,7 @@ class CMS extends ErrorHandler {
     }
 
     try {
-      await this.dataController.deleteBlogPost(body.id);
+      await this.dataController.blogController.deleteBlogPost(body.id);
     } catch(e) {
       this.send400Error(ctx, 'Blog Post Does Not Exist');
       return;

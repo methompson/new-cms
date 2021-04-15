@@ -5,22 +5,22 @@
  * post doesn't exist already.
  */
 class BlogDoesNotExistException extends Error {
-  constructor() {
-    super();
+  constructor(...params) {
+    super(...params);
     Object.setPrototypeOf(this, BlogDoesNotExistException.prototype);
   }
 }
 
 class BlogAlreadyExistsException extends Error {
-  constructor() {
-    super();
+  constructor(...params) {
+    super(...params);
     Object.setPrototypeOf(this, BlogAlreadyExistsException.prototype);
   }
 }
 
 class BlogSlugExistsException extends Error {
-  constructor() {
-    super();
+  constructor(...params) {
+    super(...params);
     Object.setPrototypeOf(this, BlogSlugExistsException.prototype);
   }
 }
@@ -29,4 +29,4 @@ export {
   BlogDoesNotExistException,
   BlogAlreadyExistsException,
   BlogSlugExistsException,
-}
+};

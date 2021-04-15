@@ -2,7 +2,11 @@ import { Pool } from 'mysql2';
 
 import Migration from './migration';
 
-const migration: Migration = {
+class MyMigration extends Migration {
+  constructor(showWarnings: boolean = false) {
+    super('00001-initial-users-table', showWarnings);
+  }
+
   async doMigration(mysqlPool: Pool) {
     const query = `
       CREATE TABLE IF NOT EXISTS users (
@@ -22,12 +26,22 @@ const migration: Migration = {
       )
     `;
 
-    const poolPromise = mysqlPool.promise();
+    const promisePool = mysqlPool.promise();
 
-    await poolPromise.execute(query);
-    console.log(query);
+    let results;
 
+    try {
+      results = await promisePool.execute(query);
+    } catch(e) {
+      this.onError(e);
+    }
+
+    this.onSuccess();
+
+    if (results.warningStatus > 0 && this.showWarnings) {
+      this.onWarning(mysqlPool);
+    }
   }
 }
 
-export default migration;
+export default MyMigration;

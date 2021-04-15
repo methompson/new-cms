@@ -1,4 +1,4 @@
-import UserTypeMap from "./usertype-map";
+import { UserTypeMap } from "@dataTypes";
 
 interface CMSContext {
   userTypeMap: UserTypeMap;
