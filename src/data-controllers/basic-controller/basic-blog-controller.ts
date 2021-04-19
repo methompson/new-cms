@@ -12,6 +12,7 @@ import {
   BlogSlugExistsException,
   BlogAlreadyExistsException,
 } from '@root/exceptions/blog-exceptions';
+import { UnimplementedMethodException } from '@root/exceptions/cms-exceptions';
 
 class BasicBlogController extends BasicDataControllerBase implements BlogController {
   protected _blogPosts: {[key: string]: BlogPost } = {};
@@ -40,7 +41,11 @@ class BasicBlogController extends BasicDataControllerBase implements BlogControl
     this.dataLocation = dataLocation;
   }
 
-  async getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
+  async getBlogPosts(pagination: number, page: number): Promise<BlogPost[]> {
+    throw new UnimplementedMethodException();
+  }
+
+  async getBlogPostBySlug(slug: string): Promise<BlogPost> {
     for (const index in this.blogPosts) {
       const post = this.blogPosts[index];
       if (slug === post.titleSlug) {
@@ -48,13 +53,17 @@ class BasicBlogController extends BasicDataControllerBase implements BlogControl
       }
     }
 
-    return null;
+    throw new BlogDoesNotExistException();
   }
 
-  async getBlogPostById(id: string): Promise<BlogPost | null> {
+  async getBlogPostById(id: string): Promise<BlogPost> {
     const post = this.blogPosts[id];
 
-    return post ?? null;
+    if (post === null || typeof post === 'undefined') {
+      throw new BlogDoesNotExistException();
+    }
+
+    return post;
   }
 
   async addBlogPost(blogPost: NewBlogPost): Promise<BlogPost> {
@@ -64,10 +73,7 @@ class BasicBlogController extends BasicDataControllerBase implements BlogControl
 
     const id = this.getNextBlogId();
 
-    const newBlogPost: BlogPost = {
-      ...blogPost,
-      id,
-    };
+    const newBlogPost: BlogPost = BlogPost.fromNewBlogPost(blogPost, id);
 
     this.saveBlogPost(newBlogPost);
 

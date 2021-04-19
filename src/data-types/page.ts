@@ -1,61 +1,44 @@
 // tslint:disable:max-classes-per-file
 
 import { InvalidJSONException } from '@root/exceptions/data-controller-exceptions';
-
-class PageSection {
-  constructor(
-    public name: string,
-    public classes: string[],
-    public contentType: string,
-    public content: string,
-  ) {}
-
-  static fromJson(rawJson: any): PageSection {
-    if (typeof rawJson?.name === 'string'
-      && Array.isArray(rawJson?.classes)
-      && rawJson?.classes.every((item) => typeof item === 'string')
-      && typeof rawJson?.contentType === 'string'
-      && typeof rawJson?.content === 'string'
-    ) {
-      return new PageSection(
-        rawJson.name,
-        rawJson.classes,
-        rawJson.contentType,
-        rawJson.content,
-      );
-    }
-
-    throw new InvalidJSONException();
-  }
-
-  toJSON(): string {
-    return JSON.stringify({
-      name: this.name,
-      classes: this.classes,
-      contentType: this.contentType,
-      content: this.content,
-    });
-  }
-}
+import { InvalidSlugException } from '@root/exceptions/blog-exceptions';
+import PageSection from './page-section';
+import {
+  slugify,
+  validSlug,
+} from '@root/utilities/slug';
 
 class NewPage {
   constructor(
-    public name: string,
-    public slug: string,
+    public title: string,
+    public titleSlug: string,
     public published: boolean,
     public content: PageSection[],
     public meta: {[key: string]: any},
     public authorId: string,
+    public dateAdded: number,
+    public dateUpdated: number,
   ) {}
 
   static fromJson(rawJson: any): NewPage {
-    if (typeof rawJson?.name !== 'string'
-      || typeof rawJson?.slug !== 'string'
+    if (typeof rawJson?.title !== 'string'
       || typeof rawJson?.published !== 'boolean'
       || typeof rawJson?.authorId !== 'string'
       || !Array.isArray(rawJson?.content)
     ) {
       throw new InvalidJSONException();
+    }
+
+    let titleSlug: string;
+
+    if (typeof rawJson?.titleSlug === 'string') {
+      if (validSlug(rawJson.titleSlug)) {
+        titleSlug = rawJson.titleSlug;
+      } else {
+        throw new InvalidSlugException();
+      }
+    } else {
+      titleSlug = slugify(rawJson.title);
     }
 
     const content: PageSection[] = [];
@@ -67,13 +50,32 @@ class NewPage {
       } catch(_) {}
     });
 
+    let meta;
+    try {
+      meta = JSON.parse(JSON.stringify(rawJson?.meta));
+    } catch(_) {
+      meta = {};
+    }
+
+    const now = Date.now();
+
+    const publishDate = typeof rawJson?.publishDate === 'number'
+      ? rawJson.publishDate
+      : now;
+
+    const updateDate = typeof rawJson?.updateDate === 'number'
+      ? rawJson.updateDate
+      : now;
+
     return new NewPage(
-      rawJson.name,
-      rawJson.slug,
+      rawJson.title,
+      rawJson.titleSlug,
       rawJson.published,
       content,
-      rawJson.meta,
+      meta,
       rawJson.authorId,
+      publishDate,
+      updateDate,
     );
   }
 }
@@ -81,17 +83,17 @@ class NewPage {
 class Page extends NewPage {
   constructor(
     public id: string,
-    name: string,
-    slug: string,
+    title: string,
+    titleSlug: string,
     published: boolean,
     content: PageSection[],
     meta: {[key: string]: any},
     authorId: string,
+    dateAdded: number,
+    dateUpdated: number,
     public lastUpdatedBy: string,
-    public dateAdded: number,
-    public dateUpdated: number,
   ) {
-    super(name, slug, published, content, meta, authorId);
+    super(title, titleSlug, published, content, meta, authorId, dateAdded, dateUpdated);
   }
 
   static fromJson(rawJson): Page {
@@ -99,7 +101,7 @@ class Page extends NewPage {
     const newPage = NewPage.fromJson(rawJson);
 
     if (typeof rawJson?.id !== 'string'
-      || typeof rawJson?.lawUpdatedBy !== 'string'
+      || typeof rawJson?.lastUpdatedBy !== 'string'
       || typeof rawJson?.dateAdded !== 'number'
       || typeof rawJson?.dateUpdated !== 'number'
     ) {
@@ -108,8 +110,8 @@ class Page extends NewPage {
 
     return new Page(
       rawJson.id,
-      newPage.name,
-      newPage.slug,
+      newPage.title,
+      newPage.titleSlug,
       newPage.published,
       newPage.content,
       newPage.meta,
@@ -117,6 +119,21 @@ class Page extends NewPage {
       rawJson.lastUpdatedBy,
       rawJson.dateAdded,
       rawJson.dateUpdated,
+    );
+  }
+
+  static fromNewPage(newPage: NewPage, id: string): Page {
+    return new Page(
+      id,
+      newPage.title,
+      newPage.titleSlug,
+      newPage.published,
+      newPage.content,
+      newPage.meta,
+      newPage.authorId,
+      newPage.dateAdded,
+      newPage.dateUpdated,
+      newPage.authorId,
     );
   }
 }

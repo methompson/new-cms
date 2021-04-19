@@ -11,8 +11,8 @@ class MyMigration extends Migration {
     const query = `
       CREATE TABLE IF NOT EXISTS pages (
         id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
-        name VARCHAR(512) NOT NULL,
-        slug VARCHAR(512) UNIQUE NOT NULL,
+        title VARCHAR(512) NOT NULL,
+        titleSlug VARCHAR(512) UNIQUE NOT NULL,
         published BOOLEAN NOT NULL DEFAULT FALSE,
         content JSON NOT NULL DEFAULT (JSON_ARRAY()),
         meta JSON NOT NULL DEFAULT (JSON_OBJECT()),

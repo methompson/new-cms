@@ -1,5 +1,5 @@
 import { User, NewUser } from './user';
-import { BlogPost, NewBlogPost } from './blog-post';
+import { BlogPost, NewBlogPost, BlogMeta } from './blog-post';
 import { Page, NewPage } from './page';
 import { UserType, UserTypeMap, defaultUserTypes } from './usertype';
 import UserToken from './user-token';
@@ -10,6 +10,7 @@ export {
   NewUser,
   BlogPost,
   NewBlogPost,
+  BlogMeta,
   Page,
   NewPage,
   UserType,

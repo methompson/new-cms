@@ -11,6 +11,9 @@ import {
   User,
   NewBlogPost,
   BlogPost,
+  BlogMeta,
+  Page,
+  NewPage,
 } from '@dataTypes';
 import { DataController } from '@root/data-controllers/interfaces';
 import ErrorHandler from './error-handler';
@@ -18,7 +21,8 @@ import { useRouteProtection } from './route-protection';
 import { ParameterizedContext } from 'koa';
 import { EmailExistsException, InsufficientPermissionsException, UserExistsException } from '@root/exceptions/user-exceptions';
 import { InvalidDataControllerException } from '@root/exceptions/cms-exceptions';
-import { BlogAlreadyExistsException, BlogDoesNotExistException } from '@root/exceptions/blog-exceptions';
+import { BlogAlreadyExistsException, BlogDoesNotExistException, BlogSlugExistsException } from '@root/exceptions/blog-exceptions';
+import { InvalidResultException } from '@root/exceptions/data-controller-exceptions';
 
 class CMS extends ErrorHandler {
   dataController: DataController;
@@ -26,6 +30,7 @@ class CMS extends ErrorHandler {
 
   blogRouter: Router;
   userRouter: Router;
+  pageRouter: Router;
 
   context: CMSContext;
 
@@ -76,11 +81,13 @@ class CMS extends ErrorHandler {
 
     this.blogRouter = this.initBlogRouter();
     this.userRouter = this.initUserRouter();
+    this.pageRouter = this.initPageRouter();
 
     const r = new Router();
 
     r.use('/user', this.userRouter.routes());
     r.use('/blog', this.blogRouter.routes());
+    r.use('/page', this.pageRouter.routes());
 
     this.mainRouter = r;
   }
@@ -97,6 +104,24 @@ class CMS extends ErrorHandler {
     r.get(
       '/slug',
       async (ctx, next) => this.getBlogPostBySlug(ctx, next),
+    );
+
+    r.get(
+      '/posts',
+      async (ctx, next) => this.getPaginatedBlogPosts(ctx, next, false),
+    );
+
+    r.get(
+      '/posts-admin',
+      useRouteProtection(),
+      async (ctx, next) => this.filterByUserType(ctx, next, writerUserType),
+      async (ctx, next) => this.getPaginatedBlogPosts(ctx, next, true),
+    );
+
+    r.get('/posts-admin-meta',
+      useRouteProtection(),
+      async (ctx, next) => this.filterByUserType(ctx, next, writerUserType),
+      async (ctx, next) => this.getPaginatedBlogMeta(ctx, next, true),
     );
 
     r.post(
@@ -191,6 +216,52 @@ class CMS extends ErrorHandler {
     return r;
   }
 
+  private initPageRouter(): Router {
+    const writerUserType = this.context.userTypeMap.getUserType('Writer');
+
+    const r = new Router();
+
+    r.get(
+      '/id',
+      async (ctx, next) => this.getPageById(ctx, next),
+    );
+
+    r.get(
+      '/slug',
+      async (ctx, next) => this.getPageBySlug(ctx, next),
+    );
+
+    r.get(
+      '/pages-admin',
+      useRouteProtection(),
+      async (ctx, next) => this.filterByUserType(ctx, next, writerUserType),
+      async (ctx, next) => this.getPageMeta(ctx, next),
+    );
+
+    r.post(
+      '/add',
+      useRouteProtection(),
+      async (ctx, next) => this.filterByUserType(ctx, next, writerUserType),
+      async (ctx, next) => this.addNewPage(ctx, next),
+    );
+
+    r.post(
+      '/edit',
+      useRouteProtection(),
+      async (ctx, next) => this.filterByUserType(ctx, next, writerUserType),
+      async (ctx, next) => this.editPage(ctx, next),
+    );
+
+    r.post(
+      '/delete',
+      useRouteProtection(),
+      async (ctx, next) => this.filterByUserType(ctx, next, writerUserType),
+      async (ctx, next) => this.deletePage(ctx, next),
+    );
+
+    return r;
+  }
+
   private hashPassword(password: string): string {
     return bcrypt.hashSync(password, 12);
   }
@@ -215,6 +286,10 @@ class CMS extends ErrorHandler {
 
     await next();
   }
+
+  /*************************************************************************************
+   * User Routes
+   ********************************************************************************** */
 
   private async logUserIn(ctx: ParameterizedContext, next: () => Promise<any>) {
     const body = ctx?.request?.body;
@@ -269,16 +344,16 @@ class CMS extends ErrorHandler {
   }
 
   private async getUserById(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body;
+    const id = ctx?.query?.id;
 
-    if (typeof body?.id !== 'string') {
+    if (typeof id !== 'string') {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
 
     let user: User;
     try {
-      user = await this.dataController.userController.getUserById(body.id);
+      user = await this.dataController.userController.getUserById(id);
     } catch(e) {
       this.send400Error(ctx, 'Invalid user ID provided');
       return;
@@ -295,9 +370,9 @@ class CMS extends ErrorHandler {
   }
 
   private async getUserByUserName(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body;
+    const username = ctx?.query?.username;
 
-    if (typeof body?.username !== 'string') {
+    if (typeof username !== 'string') {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
@@ -305,7 +380,7 @@ class CMS extends ErrorHandler {
     let user: User;
 
     try {
-      user = await this.dataController.userController.getUserByUsername(body.username);
+      user = await this.dataController.userController.getUserByUsername(username);
 
     } catch (e) {
       this.send400Error(ctx, 'Invalid username provided');
@@ -358,7 +433,9 @@ class CMS extends ErrorHandler {
       savedUser = await this.dataController.userController.addUser(u);
     } catch (e) {
       if (e instanceof UserExistsException) {
-        this.send400Error(ctx, `Username or email already exists`);
+        this.send400Error(ctx, `Username already exists`);
+      } else if(e instanceof EmailExistsException) {
+        this.send400Error(ctx, `Email already exists`);
       } else {
         this.send500Error(ctx, `Error while saving user: ${e}`);
       }
@@ -706,35 +783,31 @@ class CMS extends ErrorHandler {
     next();
   }
 
+  /*************************************************************************************
+   * Blog Routes
+   ********************************************************************************** */
+
   private async getBlogPostById(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body?.blog;
+    const id = ctx?.query?.id;
 
-    if (typeof body?.id !== 'string') {
+    if (typeof id !== 'string' && typeof id !== 'number') {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
 
-    const post = await this.dataController.blogController.getBlogPostById(body.id);
+    let post: BlogPost;
 
-    ctx.body = {
-      msg: '/id',
-    };
+    try {
+      post = await this.dataController.blogController.getBlogPostById(`${id}`);
+    } catch (e) {
+      if (e instanceof InvalidResultException) {
+        this.send500Error(ctx, `Server error: ${e.message}`);
+      } else if (e instanceof BlogDoesNotExistException) {
+        this.send404Error(ctx, 'Blog Post Does Not Exist');
+      } else {
+        this.send400Error(ctx, 'Invalid data provided');
+      }
 
-    next();
-  }
-
-  private async getBlogPostBySlug(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body?.blog;
-
-    if (typeof body?.slug !== 'string') {
-      this.send400Error(ctx, 'Invalid data provided');
-      return;
-    }
-
-    const post = await this.dataController.blogController.getBlogPostBySlug(body.slug);
-
-    if (post == null) {
-      this.send404Error(ctx, 'Blog Post Does Not Exist');
       return;
     }
 
@@ -742,6 +815,106 @@ class CMS extends ErrorHandler {
       blogPost: {
         ...post,
       },
+    };
+
+    next();
+  }
+
+  private async getBlogPostBySlug(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const slug = ctx?.query?.slug;
+
+    if (typeof slug !== 'string') {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    let post: BlogPost;
+
+    try {
+      post = await this.dataController.blogController.getBlogPostBySlug(slug);
+    } catch (e) {
+      if (e instanceof InvalidResultException) {
+        this.send500Error(ctx, `Server error: ${e.message}`);
+      } else if (e instanceof BlogDoesNotExistException) {
+        this.send404Error(ctx, 'Blog Post Does Not Exist');
+      } else {
+        this.send400Error(ctx, 'Invalid data provided');
+      }
+
+      return;
+    }
+
+    ctx.body = {
+      blogPost: {
+        ...post,
+      },
+    };
+
+    next();
+  }
+
+  private async getPaginatedBlogPosts(ctx: ParameterizedContext, next: () => Promise<any>, admin: boolean = false) {
+    const queryParams = ctx?.query;
+
+    const paginationStr = typeof queryParams?.pagination === 'string'
+      ? queryParams.pagination
+      : '10';
+    const pageStr = typeof queryParams?.page === 'string'
+      ? queryParams.page
+      : '1';
+
+    const pagination = parseInt(paginationStr, 10);
+    const page = parseInt(pageStr, 10);
+
+    let posts: BlogPost[];
+
+    try {
+      posts = await this.dataController.blogController.getBlogPosts(pagination, page, admin);
+    } catch (e) {
+      if (e instanceof InvalidResultException) {
+        this.send500Error(ctx, `Server error: ${e.message}`);
+      } else {
+        this.send400Error(ctx, 'Invalid data provided');
+      }
+
+      return;
+    }
+
+    ctx.body = {
+      posts,
+    };
+
+    next();
+  }
+
+  private async getPaginatedBlogMeta(ctx: ParameterizedContext, next: () => Promise<any>, admin: boolean = false) {
+    // Very large value
+    // const pagination = 18446744073709551615;
+    const pagination = Math.pow(2, 53);
+    const page = 1;
+
+    let posts: BlogPost[];
+
+    try {
+      posts = await this.dataController.blogController.getBlogPosts(pagination, page, admin);
+    } catch (e) {
+      if (e instanceof InvalidResultException) {
+        this.send500Error(ctx, `Server error: ${e.message}`);
+      } else {
+        this.send400Error(ctx, 'Invalid data provided');
+      }
+
+      return;
+    }
+
+    const meta: BlogMeta[] = [];
+
+    posts.forEach((p) => {
+      meta.push(p.blogMeta);
+    });
+
+    ctx.body = {
+      meta,
     };
 
     next();
@@ -763,7 +936,12 @@ class CMS extends ErrorHandler {
     try {
       savedPost = await this.dataController.blogController.addBlogPost(p);
     } catch(e) {
-      this.send400Error(ctx, 'Add error');
+      if (e instanceof BlogSlugExistsException) {
+        this.send400Error(ctx, 'Blog Slug Already Exists');
+      } else {
+        this.send400Error(ctx, 'Add error');
+      }
+
       return;
     }
 
@@ -790,13 +968,15 @@ class CMS extends ErrorHandler {
     try {
       savedPost = await this.dataController.blogController.editBlogPost(p);
     } catch(e) {
-      let errMsg = 'Add Error';
+      let errMsg = 'Edit Error';
       if (e instanceof BlogDoesNotExistException) {
         errMsg += ': Blog entry does not exist';
       } else if (e instanceof BlogAlreadyExistsException) {
         errMsg += ': Blog Slug already exists';
       }
+
       this.send400Error(ctx, errMsg);
+
       return;
     }
 
@@ -824,6 +1004,78 @@ class CMS extends ErrorHandler {
 
     ctx.body = {
       msg: `Blog Post id ${body.id} deleted`,
+    };
+
+    next();
+  }
+
+
+  /*************************************************************************************
+   * Page Routes
+   ********************************************************************************** */
+
+  private async getPageById(ctx: ParameterizedContext, next: () => Promise<any>) {
+    ctx.body = {
+      msg: ctx.originalUrl,
+    };
+
+    next();
+  }
+
+  private async getPageBySlug(ctx: ParameterizedContext, next: () => Promise<any>) {
+    ctx.body = {
+      msg: ctx.originalUrl,
+    };
+
+    next();
+  }
+
+  private async getPageMeta(ctx: ParameterizedContext, next: () => Promise<any>) {
+    ctx.body = {
+      msg: ctx.originalUrl,
+    };
+
+    next();
+  }
+
+  private async addNewPage(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const pageData = ctx?.request?.body?.page;
+
+    let p: NewPage;
+
+    try {
+      p = NewPage.fromJson(pageData);
+    } catch(e) {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    let savedPage: Page;
+    try {
+      savedPage = await this.dataController.pageController.addPage(p);
+    } catch(e) {
+      this.send400Error(ctx, 'Add Error');
+      return;
+    }
+
+    ctx.body = {
+      ...savedPage,
+    };
+
+    next();
+  }
+
+  private async editPage(ctx: ParameterizedContext, next: () => Promise<any>) {
+    ctx.body = {
+      msg: ctx.originalUrl,
+    };
+
+    next();
+  }
+
+  private async deletePage(ctx: ParameterizedContext, next: () => Promise<any>) {
+    ctx.body = {
+      msg: ctx.originalUrl,
     };
 
     next();

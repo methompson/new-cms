@@ -25,8 +25,16 @@ class BlogSlugExistsException extends Error {
   }
 }
 
+class InvalidSlugException extends Error {
+  constructor(...params) {
+    super(...params);
+    Object.setPrototypeOf(this, InvalidSlugException.prototype);
+  }
+}
+
 export {
   BlogDoesNotExistException,
   BlogAlreadyExistsException,
   BlogSlugExistsException,
+  InvalidSlugException,
 };

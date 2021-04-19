@@ -11,12 +11,13 @@ class MyMigration extends Migration {
     const query = `
       CREATE TABLE IF NOT EXISTS blogPosts (
         id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
-        name VARCHAR(512) NOT NULL,
-        slug VARCHAR(512) UNIQUE NOT NULL,
-        published BOOLEAN NOT NULL DEFAULT FALSE,
+        title VARCHAR(512) NOT NULL,
+        titleSlug VARCHAR(512) UNIQUE NOT NULL,
         content JSON NOT NULL DEFAULT (JSON_ARRAY()),
-        meta JSON NOT NULL DEFAULT (JSON_OBJECT()),
+        preview TEXT NOT NULL,
         authorId INT,
+        meta JSON NOT NULL DEFAULT (JSON_OBJECT()),
+        published BOOLEAN NOT NULL DEFAULT FALSE,
         dateAdded DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         dateUpdated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (authorId)
