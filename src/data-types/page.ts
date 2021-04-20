@@ -96,6 +96,10 @@ class Page extends NewPage {
     super(title, titleSlug, published, content, meta, authorId, dateAdded, dateUpdated);
   }
 
+  get pageMeta(): PageMeta {
+    return PageMeta.fromPage(this);
+  }
+
   static fromJson(rawJson): Page {
     // Should throw an error if this is invalid
     const newPage = NewPage.fromJson(rawJson);
@@ -116,9 +120,9 @@ class Page extends NewPage {
       newPage.content,
       newPage.meta,
       newPage.authorId,
-      rawJson.lastUpdatedBy,
       rawJson.dateAdded,
       rawJson.dateUpdated,
+      rawJson.lastUpdatedBy,
     );
   }
 
@@ -138,8 +142,37 @@ class Page extends NewPage {
   }
 }
 
+class PageMeta {
+  constructor(
+    public id: string,
+    public title: string,
+    public titleSlug: string,
+    public published: boolean,
+    public meta: {[key: string]: any},
+    public authorId: string,
+    public dateAdded: number,
+    public dateUpdated: number,
+    public lastUpdatedBy: string,
+  ) {}
+
+  static fromPage(page: Page) {
+    return new PageMeta(
+      page.id,
+      page.title,
+      page.titleSlug,
+      page.published,
+      page.meta,
+      page.authorId,
+      page.dateAdded,
+      page.dateUpdated,
+      page.lastUpdatedBy,
+    );
+  }
+}
+
 export {
   PageSection,
   NewPage,
   Page,
+  PageMeta,
 };

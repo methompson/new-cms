@@ -82,7 +82,7 @@ class MySQLBlogController extends MySQLDataControllerBase implements BlogControl
         const post = BlogPost.fromJson({
           ...p,
           id: `${p.id}`,
-          author: `${p.author}`,
+          authorId: `${p.authorId}`,
           published: p.published === 1,
           dateAdded: (p.dateAdded as Date).getTime(),
           dateUpdated: (p.dateUpdated as Date).getTime(),
@@ -141,7 +141,7 @@ class MySQLBlogController extends MySQLDataControllerBase implements BlogControl
     const post = BlogPost.fromJson({
       ...p,
       id: `${p.id}`,
-      authorId: `${p.author}`,
+      authorId: `${p.authorId}`,
       published: p.published === 1,
       dateAdded: (p.dateAdded as Date).getTime(),
       dateUpdated: (p.dateUpdated as Date).getTime(),
@@ -164,7 +164,7 @@ class MySQLBlogController extends MySQLDataControllerBase implements BlogControl
         meta,
         authorId,
         dateAdded,
-        datedUpdated
+        dateUpdated
       FROM blogPosts
       WHERE id = ?
     `;
@@ -196,7 +196,7 @@ class MySQLBlogController extends MySQLDataControllerBase implements BlogControl
     const post = BlogPost.fromJson({
       ...p,
       id: `${p.id}`,
-      author: `${p.author}`,
+      authorId: `${p.authorId}`,
       published: p.published === 1,
       dateAdded: (p.dateAdded as Date).getTime(),
       dateUpdated: (p.dateUpdated as Date).getTime(),
@@ -307,6 +307,12 @@ class MySQLBlogController extends MySQLDataControllerBase implements BlogControl
     try {
       [results] = await promisePool.execute(query, queryParams);
     } catch(e) {
+      if (e.code === 'ER_DUP_ENTRY') {
+        if (e.message.includes('titleSlug')) {
+          throw new BlogSlugExistsException();
+        }
+      }
+
       throw new Error('MySQL Error');
     }
 
@@ -342,8 +348,6 @@ class MySQLBlogController extends MySQLDataControllerBase implements BlogControl
     if (results.affectedRows === 0) {
       throw new InvalidResultException();
     }
-
-    console.log();
   }
 
 }

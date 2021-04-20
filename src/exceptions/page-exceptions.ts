@@ -7,7 +7,15 @@ class SlugExistsException extends Error {
   }
 }
 
+class PageDoesNotExistException extends Error {
+  constructor(...params) {
+    super(...params);
+    Object.setPrototypeOf(this, PageDoesNotExistException.prototype);
+  }
+}
+
 
 export {
   SlugExistsException,
+  PageDoesNotExistException,
 };

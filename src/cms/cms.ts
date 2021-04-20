@@ -14,6 +14,7 @@ import {
   BlogMeta,
   Page,
   NewPage,
+  PageMeta,
 } from '@dataTypes';
 import { DataController } from '@root/data-controllers/interfaces';
 import ErrorHandler from './error-handler';
@@ -914,7 +915,7 @@ class CMS extends ErrorHandler {
     });
 
     ctx.body = {
-      meta,
+      psts: meta,
     };
 
     next();
@@ -971,7 +972,7 @@ class CMS extends ErrorHandler {
       let errMsg = 'Edit Error';
       if (e instanceof BlogDoesNotExistException) {
         errMsg += ': Blog entry does not exist';
-      } else if (e instanceof BlogAlreadyExistsException) {
+      } else if (e instanceof BlogSlugExistsException) {
         errMsg += ': Blog Slug already exists';
       }
 
@@ -988,51 +989,116 @@ class CMS extends ErrorHandler {
   }
 
   private async deleteBlogPost(ctx: ParameterizedContext, next: () => Promise<any>) {
-    const body = ctx?.request?.body?.blog;
+    const id = ctx?.request?.body?.blog?.id;
 
-    if (typeof body?.id !== 'string') {
+    if (typeof id !== 'string') {
       this.send400Error(ctx, 'Invalid data provided');
       return;
     }
 
     try {
-      await this.dataController.blogController.deleteBlogPost(body.id);
+      await this.dataController.blogController.deleteBlogPost(id);
     } catch(e) {
       this.send400Error(ctx, 'Blog Post Does Not Exist');
       return;
     }
 
     ctx.body = {
-      msg: `Blog Post id ${body.id} deleted`,
+      msg: `Blog Post id ${id} deleted`,
     };
 
     next();
   }
-
 
   /*************************************************************************************
    * Page Routes
    ********************************************************************************** */
 
   private async getPageById(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const id = ctx?.query?.id;
+
+    if (typeof id !== 'string' && typeof id !== 'number') {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    let page: Page;
+
+    try {
+      page = await this.dataController.pageController.getPageById(`${id}`);
+    } catch (e) {
+      if (e instanceof InvalidResultException) {
+        this.send500Error(ctx, `Server error: ${e.message}`);
+      } else if (e instanceof BlogDoesNotExistException) {
+        this.send404Error(ctx, 'Page Does Not Exist');
+      } else {
+        this.send400Error(ctx, 'Invalid data provided');
+      }
+
+      return;
+    }
+
     ctx.body = {
-      msg: ctx.originalUrl,
+      page: {
+        ...page,
+      },
     };
 
     next();
   }
 
   private async getPageBySlug(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const slug = ctx?.query?.slug;
+
+    if (typeof slug !== 'string') {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    let page: Page;
+
+    try {
+      page = await this.dataController.pageController.getPageBySlug(`${slug}`);
+    } catch (e) {
+      if (e instanceof InvalidResultException) {
+        this.send500Error(ctx, `Server error: ${e.message}`);
+      } else if (e instanceof BlogDoesNotExistException) {
+        this.send404Error(ctx, 'Page Does Not Exist');
+      } else {
+        this.send400Error(ctx, 'Invalid data provided');
+      }
+
+      return;
+    }
+
     ctx.body = {
-      msg: ctx.originalUrl,
+      page: {
+        ...page,
+      },
     };
 
     next();
   }
 
   private async getPageMeta(ctx: ParameterizedContext, next: () => Promise<any>) {
+    let meta: PageMeta[];
+
+    try {
+      meta = await this.dataController.pageController.getPageMeta();
+    } catch (e) {
+      if (e instanceof InvalidResultException) {
+        this.send500Error(ctx, `Server error: ${e.message}`);
+      } else if (e instanceof BlogDoesNotExistException) {
+        this.send404Error(ctx, 'Page Does Not Exist');
+      } else {
+        this.send400Error(ctx, 'Invalid data provided');
+      }
+
+      return;
+    }
+
     ctx.body = {
-      msg: ctx.originalUrl,
+      pages: meta,
     };
 
     next();
@@ -1066,16 +1132,53 @@ class CMS extends ErrorHandler {
   }
 
   private async editPage(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const pageData = ctx?.request?.body?.page;
+
     ctx.body = {
       msg: ctx.originalUrl,
+    };
+
+    let p: Page;
+
+    try {
+      p = Page.fromJson(pageData);
+    } catch(e) {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    let editPage: Page;
+    try {
+      editPage = await this.dataController.pageController.editPage(p);
+    } catch (e) {
+      this.send400Error(ctx, 'Error Editing Page');
+      return;
+    }
+
+    ctx.body = {
+      ...editPage,
     };
 
     next();
   }
 
   private async deletePage(ctx: ParameterizedContext, next: () => Promise<any>) {
+    const id = ctx?.request?.body?.page?.id;
+
+    if (typeof id !== 'string') {
+      this.send400Error(ctx, 'Invalid data provided');
+      return;
+    }
+
+    try {
+      await this.dataController.pageController.deletePage(id);
+    } catch(e) {
+      this.send400Error(ctx, 'Blog Post Does Not Exist');
+      return;
+    }
+
     ctx.body = {
-      msg: ctx.originalUrl,
+      msg: `Blog Post id ${id} deleted`,
     };
 
     next();

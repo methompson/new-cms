@@ -10,6 +10,7 @@ import {
 import {
   NewPage,
   Page,
+  PageMeta,
 } from '@dataTypes';
 
 class BasicPageController extends BasicDataControllerBase implements PageController {
@@ -23,6 +24,10 @@ class BasicPageController extends BasicDataControllerBase implements PageControl
   }
 
   async getPageById(id: string): Promise<Page> {
+    throw new UnimplementedMethodException();
+  }
+
+  async getPageMeta(): Promise<PageMeta[]> {
     throw new UnimplementedMethodException();
   }
 
