@@ -1,35 +1,18 @@
-import { Pool, createPool, ResultSetHeader } from 'mysql2';
 
 import MySQLDataControllerBase from './myqsl-controller-base';
-
-import migrations from './db-migrations';
 import {
-  BlogPost,
-  NewBlogPost,
-  CMSContext,
-  NewUser,
-  User,
   NewPage,
   Page,
   PageMeta,
 } from "@dataTypes";
-import { DataController, PageController } from "../interfaces";
-import {
-  InvalidDataControllerConfigException,
-  UnimplementedMethodException,
-} from '@root/exceptions/cms-exceptions';
+import { PageController } from "../interfaces";
+
 import {
   SlugExistsException,
   PageDoesNotExistException,
 } from '@root/exceptions/page-exceptions';
 import { InvalidResultException } from '@root/exceptions/data-controller-exceptions';
-import {
-  EmailExistsException,
-  InvalidUserIdException,
-  UserDoesNotExistException,
-  UserExistsException,
-  InvalidPasswordTokenException,
-} from '@root/exceptions/user-exceptions';
+
 
 class MySQLPageController extends MySQLDataControllerBase implements PageController {
   async getPageBySlug(slug: string): Promise<Page> {

@@ -18,7 +18,7 @@ class BasicBlogController extends BasicDataControllerBase implements BlogControl
   protected _blogPosts: {[key: string]: BlogPost } = {};
 
   protected _blogFileName = 'blog.json';
-  protected _blogWriiteLock: boolean = false;
+  protected _blogWriteLock: boolean = false;
   protected _blogWriteAgain: boolean = false;
 
   get blogPosts() {
@@ -28,8 +28,7 @@ class BasicBlogController extends BasicDataControllerBase implements BlogControl
   get slugMap():{[key: string]: BlogPost} {
     const slugMap: {[key: string]: BlogPost} = {};
 
-    Object.keys(this._blogPosts).forEach((key) => {
-      const post = this._blogPosts[key];
+    Object.values(this._blogPosts).forEach((post) => {
       slugMap[post.titleSlug] = post;
     });
 
@@ -144,27 +143,25 @@ class BasicBlogController extends BasicDataControllerBase implements BlogControl
       }
     });
 
-    const newId = largestId > 0 ? largestId + 1 : 1;
-
-    return `${newId}`;
+    return `${largestId + 1}`;
   }
 
   // TODO Where do I put the users file?
-  protected async writeBlogData(): Promise<void> {
-    if (this._blogWriiteLock === true) {
+  async writeBlogData(): Promise<void> {
+    if (this._blogWriteLock === true) {
       console.log("blog writelock hit");
       this._blogWriteAgain = true;
       return;
     }
 
-    this._blogWriiteLock = true;
+    this._blogWriteLock = true;
 
     const loc = path.join(this.dataLocation, this._blogFileName);
     const handle = await open(loc, 'w+');
     await writeFile(handle, JSON.stringify(this._blogPosts));
 
     await handle.close();
-    this._blogWriiteLock = false;
+    this._blogWriteLock = false;
 
     if (this._blogWriteAgain === true) {
       console.log("write blog again");
@@ -173,7 +170,7 @@ class BasicBlogController extends BasicDataControllerBase implements BlogControl
     }
   }
 
-  protected async readBlogData(): Promise<void> {
+  async readBlogData(): Promise<void> {
     await mkdir(this.dataLocation, { recursive: true });
 
     // We have to use a+ to create the file if it doesn't exist.

@@ -41,8 +41,8 @@ import { BasicDataController, MySQLDataController } from './data-controllers';
     });
 
     cms = new CMS();
-    await cms.init(mysqlDC);
-    // await cms.init(bdc);
+    // await cms.init(mysqlDC);
+    await cms.init(bdc);
   } catch (e) {
     // handle accordingly
     console.log('Unable to instance data controller', e);

@@ -193,7 +193,7 @@ class BasicUserController extends BasicDataControllerBase implements UserControl
   }
 
   // TODO create a lock and queue to prevent bad things from happening.
-  protected async writeUserData(): Promise<void> {
+  async writeUserData(): Promise<void> {
     if (this._userWriteLock === true) {
       console.log("user writelock hit");
       this._userWriteAgain = true;
@@ -229,7 +229,7 @@ class BasicUserController extends BasicDataControllerBase implements UserControl
    * This method will read the data from the user file using the user data handle.
    * It will parse the contents of the file and insert the value into the _users variable.
    */
-   protected async readUserData(): Promise<void> {
+  async readUserData(): Promise<void> {
     await mkdir(this.dataLocation, { recursive: true });
 
     // We have to use a+ to create the file if it doesn't exist.

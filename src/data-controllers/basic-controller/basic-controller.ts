@@ -20,16 +20,22 @@ class BasicDataController extends DataController {
 
     const dataLocation = this._constructionOptions?.dataLocation ?? './';
 
-    this._userController = new BasicUserController(dataLocation);
-    this._blogController = new BasicBlogController(dataLocation);
-    this._pageController = new BasicPageController(dataLocation);
+    const userController = new BasicUserController(dataLocation);
+    const blogController = new BasicBlogController(dataLocation);
+    const pageController = new BasicPageController(dataLocation);
 
     try {
-      // await this.readUserData();
-      // await this.readBlogData();
+      await userController.readUserData();
+      await blogController.readBlogData();
+      await pageController.readPageData();
+
     } catch(e) {
       console.log('Read error');
     }
+
+    this._userController = userController;
+    this._blogController = blogController;
+    this._pageController = pageController;
 
     console.log('initialized');
 
